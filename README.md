@@ -1,10 +1,10 @@
 # Tidy Tunes
 
-Tidy Tunes is an easy-to-use pipeline for mining high-quality audio data for speech generation models. To do so, it chains multiple open source models while minizing dependencies.
+Tidy Tunes is an easy-to-use pipeline for mining high-quality audio data for speech generation models. To do so, it chains multiple open source models while minimizing dependencies.
 
 Specifically, the pipeline includes (see also https://www.arxiv.org/pdf/2409.03283):
 - voice source segmentation
-- segmentation based on voice actividy detection
+- segmentation based on voice activity detection
 - speaker segmentation 
 - rolloff frequency filtering
 - filtering based on PESQ of denoised audio 
