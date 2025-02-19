@@ -1,0 +1,29 @@
+name: isort
+
+on: [pull_request]
+
+jobs:
+  isort:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ "3.10" ]
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v1
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install isort
+        run: |
+          python3 -m pip install --upgrade pip isort==5.13.2
+
+      - name: Run isort
+        shell: bash
+        run: |
+          isort --profile black --filter-files --dont-follow-links --check --diff .

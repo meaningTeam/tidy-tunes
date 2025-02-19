@@ -1,0 +1,100 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tidytunes"
+version = "1.0.0"
+description = "An easy-to-use pipeline for mining high-quality audio data for speech generation models."
+readme = "README.md"
+authors = [
+    { name = "Tomas Nekvinda", email = "tomas@meaning.team" },
+    { name = "Jan Vainer", email = "jan@meaning.team" },
+    { name = "Vojtech Srdecny", email = "vojta@meaning.team" }
+]
+license = { text = "MIT" }
+requires-python = ">=3.8"
+dependencies = [
+    "numpy",
+    "scikit-learn",
+    "torch",
+    "torchaudio",
+    "pyyaml",
+    "pesq",
+    "platformdirs",
+    "einops",
+    "onnxruntime-gpu",
+    "opt_einsum",
+    "yt-dlp",
+    "click",
+    "python-dotenv",
+]
+
+[project.optional-dependencies]
+tests = [
+    "pytest==8.1.1",
+    "pytest-cov==4.1.0",
+    "flake8==7.0.0",
+    "black==24.2.0",
+    "isort==5.13.2",
+    "pre-commit==3.6.2",
+]
+dev = [
+    "matplotlib",
+    "notebook",
+    "pytest==8.1.1",
+    "pytest-cov==4.1.0",
+    "flake8==7.0.0",
+    "black==24.2.0",
+    "isort==5.13.2",
+    "pre-commit==3.6.2",
+]
+
+[project.scripts]
+tidytunes = "tidytunes.bin:cli"
+
+[project.urls]
+Homepage = "https://github.com/meaningTeam/tidy-tunes"
+Documentation = "https://github.com/meaningTeam/tidy-tunes"
+Repository = "https://github.com/meaningTeam/tidy-tunes"
+
+[tool.setuptools]
+packages = { find = { where = ["src"] } }
+
+# Black Configuration
+[tool.black]
+line-length = 88
+target-version = ['py38', 'py39', 'py310', 'py311']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+# isort Configuration
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+skip_gitignore = true
+
+# pre-commit Configuration
+[tool.pre-commit]
+repos = [
+    { repo = "https://github.com/psf/black", rev = "24.2.0", hooks = [{ id = "black" }] },
+    { repo = "https://github.com/PyCQA/isort", rev = "5.13.2", hooks = [{ id = "isort" }] },
+    { repo = "https://github.com/pre-commit/pre-commit-hooks", rev = "v4.6.0", hooks = [
+        { id = "trailing-whitespace" },
+        { id = "end-of-file-fixer" },
+        { id = "check-yaml" },
+    ] },
+]

@@ -1,0 +1,19 @@
+pipeline:
+  - name: "voice_separation"
+  - name: "speech_segmentation"
+    params:
+      min_duration: 3.2
+      max_duration: 30.0
+  - name: "speaker_segmentation"
+    params:
+      min_duration: 3.2
+  - name: "rolloff_filtering"
+    condition: "lambda x: x > 10000"
+  - name: "denoising"
+    condition: "lambda x: x > 4.0"
+  - name: "mos_filtering"
+    condition: "lambda x: x > 3.3"
+  - name: "language_filtering"
+    params:
+      language_code: "en"
+    condition: "lambda x: x > 0.5"
