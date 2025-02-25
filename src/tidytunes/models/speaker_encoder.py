@@ -67,14 +67,15 @@ class SpeakerEncoder(torch.nn.Module):
         return embeddings
 
     def split_to_chunks(self, x: torch.Tensor):
-
         num_samples = min(self.num_input_frames * self.hop_length, x.shape[1])
-        num_outputs = torch.ceil(torch.tensor(x.shape[1] / num_samples)).int()
+        num_full_chunks = (
+            x.shape[1] // num_samples
+        )  # Calculate the number of full chunks
 
         frames_flat = []
-        for offset in torch.linspace(0, x.shape[1] - num_samples, num_outputs):
-            s = int(offset)
-            e = int(offset + num_samples)
+        for i in range(num_full_chunks):
+            s = i * num_samples
+            e = s + num_samples
             frames_flat.append(x[:, s:e])
 
         frames_flat = torch.cat(frames_flat, dim=0)
