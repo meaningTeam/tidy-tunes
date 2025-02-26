@@ -1,9 +1,9 @@
+from importlib.metadata import version
 from pathlib import Path
 
 import requests
 from platformdirs import user_cache_dir
 from tqdm import tqdm
-from importlib.metadata import version
 
 
 def download_github(filename: str, tag: str = None) -> Path:

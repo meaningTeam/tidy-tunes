@@ -1,7 +1,9 @@
 from functools import lru_cache
-from tidytunes.utils import Audio, collate_audios
-from tidytunes.pipeline_components.speaker_segmentation import load_speaker_encoder
+
 import torch
+
+from tidytunes.pipeline_components.speaker_segmentation import load_speaker_encoder
+from tidytunes.utils import Audio, collate_audios
 
 
 def is_male(audios: list[Audio], device="cpu"):
@@ -38,6 +40,7 @@ def load_gender_classification_model(tag: str = None):
         KMeans: Pre-trained gender classification encoder model.
     """
     import joblib
+
     from tidytunes.utils.download import download_github
 
     classificator = download_github("gender_recognition_model.pkl", tag)
