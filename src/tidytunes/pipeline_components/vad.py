@@ -42,14 +42,13 @@ def find_segments_with_speech(
 
 
 @lru_cache(maxsize=1)
-def load_vad(device: str = "cpu", tag: str = "v1.0.0"):
+def load_vad(device: str = "cpu", tag: str = None):
     """
     Loads, traces, and caches the Voice Activity Detector (VAD) model.
 
     Args:
         device (str): The device to run the VAD model on (default: "cpu").
-        tag (str): The version tag for downloading the model (default: "v1.0.0").
-
+        tag (str): The version tag for downloading the model
     Returns:
         VoiceActivityDetector: Loaded VAD model.
     """
@@ -57,7 +56,7 @@ def load_vad(device: str = "cpu", tag: str = "v1.0.0"):
     from tidytunes.models.external import SileroVAD
     from tidytunes.utils.download import download_github
 
-    model_weights_path = download_github(tag, "silerovad_weights.pt")
+    model_weights_path = download_github("silerovad_weights.pt", tag)
     vad = SileroVAD.from_files(model_weights_path)
     vad_trace = vad.to_jit_trace(device)
     return VoiceActivityDetector(vad_trace).to(device)

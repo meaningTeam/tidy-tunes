@@ -5,3 +5,4 @@ from .rolloff import get_rolloff_frequency
 from .source_separation import find_segments_without_music
 from .speaker_segmentation import find_segments_with_single_speaker
 from .vad import find_segments_with_speech
+from .gender_classification import is_male
