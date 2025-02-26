@@ -76,13 +76,24 @@ class SourceSeparator(nn.Module):
         if L <= self.chunk_len:
             return self.model(audio).mean(dim=-2)
 
-        output = torch.zeros(B, len(self.model.sources), C, L, device=audio.device)
+        output = torch.zeros(B, len(self.model.sources), L, device=audio.device)
+        buffer = None
+
         start, end = 0, self.chunk_len
         while start < L - self.overlap_frames:
             chunk = audio[:, :, start:end]
-            out = self.model(chunk)
-            out = self.fade(out)
-            output[:, :, :, start:end] += out
+            x = self.model(chunk)
+            x = self.fade(x)
+
+            chunk_output = x[..., : x.shape[-1] - self.fade.fade_out_len]
+
+            if self.fade.fade_in_len > 0:
+                chunk_output[..., : self.fade.fade_in_len] += buffer
+            buffer = x[..., x.shape[-1] - self.fade.fade_out_len :]
+
+            output[..., start : start + chunk_output.shape[-1]] = chunk_output.mean(
+                dim=-2
+            )
 
             if start == 0:
                 self.fade.fade_in_len = self.overlap_frames
@@ -92,7 +103,10 @@ class SourceSeparator(nn.Module):
 
             end += self.chunk_len
             if end >= L:
-                # Disable fade-out for last chunk
                 self.fade.fade_out_len = 0
 
-        return output.mean(dim=-2)
+        # reset the original chunk fading
+        self.fade.fade_in_len = 0
+        self.fade.fade_out_len = self.overlap_frames
+
+        return output
