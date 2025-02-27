@@ -21,11 +21,10 @@ def is_male(audios: list[Audio], device="cpu"):
         embeddings_flattened = [e.mean(dim=0) for e in embeddings]
 
     classifications = [
-        model.predict(e.reshape(1, -1))
-        for e in torch.stack(embeddings_flattened).cpu().numpy()
+        model.predict(e.cpu().numpy().reshape(1, -1)) for e in embeddings_flattened
     ]
 
-    return [True if c == 1 else False for c in classifications]
+    return [c == 1 for c in classifications]
 
 
 @lru_cache(maxsize=1)
