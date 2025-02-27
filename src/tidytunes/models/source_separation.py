@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torchaudio.transforms import Fade
 
 from tidytunes.utils import masked_mean, masked_std, sequence_mask
@@ -9,104 +10,126 @@ class SourceSeparator(nn.Module):
     def __init__(
         self,
         model,
-        segment: float = 10.0,
-        overlap: float = 0.1,
+        frame_shift: float = 0.16,
+        segment_frames: int = 63,
+        overlap_frames: int = 5,
         sampling_rate: int = 44100,
+        max_music_energy: float = 0.01,
+        min_speech_energy: float = 0.99,
+        window_frames: int = 2,
+        minimal_energy: float = 1e-7,
     ):
         super().__init__()
         self.model = model
+        self.frame_shift = frame_shift
         self.sampling_rate = sampling_rate
-        self.chunk_len = int(sampling_rate * segment * (1 + overlap))
-        self.overlap_frames = int(overlap * sampling_rate)
-        self.fade = Fade(
-            fade_in_len=0, fade_out_len=self.overlap_frames, fade_shape="linear"
-        )
+        self.frame_samples = int(frame_shift * sampling_rate)
+        self.segment_samples = self.frame_samples * segment_frames
+        self.overlap_samples = self.frame_samples * overlap_frames
+        self.fade_in = Fade(fade_in_len=self.overlap_samples, fade_out_len=0)
+        self.fade_out = Fade(fade_in_len=0, fade_out_len=self.overlap_samples)
+        self.max_music_energy = max_music_energy
+        self.min_speech_energy = min_speech_energy
+        self.window_samples = self.frame_samples * window_frames
+        self.minimal_energy = minimal_energy
 
     def forward(
         self,
-        x: torch.Tensor,
-        x_lens: torch.Tensor,
+        audio: torch.Tensor,
+        audio_lens: torch.Tensor,
     ):
         """
-        Normalizes and processes input audio to separate sources.
+        Normalizes and processes input audio to separate sources and calculates
+        the energy of vocals and the rest of sources within a sliding window to
+        decide if there is a background music together with speech or not.
 
         Args:
-            x (B, T): Input audio tensor.
-            x_lens (B,): Lengths of each sequence in the batch.
+            audio (B, T): Input audio tensor.
+            audio_lens (B,): Lengths of each sequence in the batch.
 
         Returns:
-            (B, sources, L): Separated audio sources.
+            (B, L): Mask indicating frames without music.
         """
 
-        mask = sequence_mask(x_lens)
-        mean = masked_mean(x, mask)
-        std = masked_std(x, mask, mean=mean)
+        B, T = audio.shape
 
-        x = (x - mean.unsqueeze(-1)) / std.unsqueeze(-1)
+        # Pad to nearest multiple of segment and add overlap
+        padded_lens = (
+            (T + self.segment_samples - 1) // self.segment_samples
+        ) * self.segment_samples
+        pad_size = padded_lens - T + self.overlap_samples
+
+        audio = F.pad(audio, (0, pad_size))
+
+        mask = sequence_mask(audio_lens, max_length=audio.shape[-1])
+        mean = masked_mean(audio, mask)
+        std = masked_std(audio, mask, mean=mean)
+
+        x = (audio - mean.unsqueeze(-1)) / std.unsqueeze(-1)
         x[~mask] = 0.0
 
-        y = self.get_sources(x)
-        y = y * std[:, None, None] + mean[:, None, None]
-        mask = mask.unsqueeze(1).repeat(1, 4, 1)
-        y[~mask] = 0.0
+        audio_buffer = torch.zeros(x.shape[0], self.overlap_samples, device=x.device)
+        window_buffer = None
+        output = []
 
-        # (B, sources, T), sources are: drums, bass, other, vocals
-        return y
+        for i in range((x.shape[-1] - self.overlap_samples) // self.segment_samples):
 
-    @torch.no_grad()
-    def get_sources(
-        self,
-        audio: torch.Tensor,
-    ):
-        """
-        Splits audio into overlapping chunks, processes with the model,
-        and applies fade-in/fade-out to smooth transitions.
+            s = i * self.segment_samples
+            e = (i + 1) * self.segment_samples + self.overlap_samples
+            segment = x[..., s:e]
 
-        Args:
-            audio (B, T): Normalized input audio.
+            assert segment.shape[-1] == self.segment_samples + self.overlap_samples
 
-        Returns:
-            (B, sources, T): Separated sources.
-        """
+            if i > 0:
+                segment = self.fade_in(segment)
+            segment[..., : self.overlap_samples] += audio_buffer
+            segment = self.fade_out(segment)
+            audio_buffer = segment[..., -self.overlap_samples :]
+            segment = segment[..., : -self.overlap_samples]
 
-        # The model expects stereo inputs
-        audio = audio.unsqueeze(1).expand(-1, 2, -1)
-        B, C, L = audio.shape
+            y = self.forward_segment(segment)
+            y = y * std[:, None, None] + mean[:, None, None]
 
-        if L <= self.chunk_len:
-            return self.model(audio).mean(dim=-2)
+            if window_buffer is not None:
+                y = torch.cat([window_buffer, y], dim=-1)
+            window_buffer = y[..., -self.frame_samples :]
 
-        output = torch.zeros(B, len(self.model.sources), L, device=audio.device)
-        buffer = None
+            frames = y.unfold(-1, self.window_samples, self.frame_samples)
 
-        start, end = 0, self.chunk_len
-        while start < L - self.overlap_frames:
-            chunk = audio[:, :, start:end]
-            x = self.model(chunk)
-            x = self.fade(x)
+            energy = (frames**2).mean(dim=-1)  # b c t w -> b c t
 
-            chunk_output = x[..., : x.shape[-1] - self.fade.fade_out_len]
-
-            if self.fade.fade_in_len > 0:
-                chunk_output[..., : self.fade.fade_in_len] += buffer
-            buffer = x[..., x.shape[-1] - self.fade.fade_out_len :]
-
-            output[..., start : start + chunk_output.shape[-1]] = chunk_output.mean(
-                dim=-2
+            # Merge all non-vocal channels into a single one
+            energy = torch.cat(
+                (energy[:, :3].sum(dim=-2, keepdim=True), energy[:, 3:]), dim=-2
             )
+            energy_total = energy.sum(dim=-2, keepdim=True)
+            rel_energy = energy / energy_total
 
-            if start == 0:
-                self.fade.fade_in_len = self.overlap_frames
-                start += self.chunk_len - self.overlap_frames
-            else:
-                start += self.chunk_len
+            abs_silence = energy_total.squeeze(1) < self.minimal_energy
+            no_music = abs_silence | (rel_energy[:, 0] <= self.max_music_energy)
+            is_speech = abs_silence | (rel_energy[:, 1] >= self.min_speech_energy)
+            output.append(no_music & is_speech)
 
-            end += self.chunk_len
-            if end >= L:
-                self.fade.fade_out_len = 0
+        output = torch.cat(output, dim=-1)
 
-        # reset the original chunk fading
-        self.fade.fade_in_len = 0
-        self.fade.fade_out_len = self.overlap_frames
+        # Trim output to remove segment padding and mask invalid positions
+        n_frames = (
+            audio_lens + 2 * self.frame_samples - 1 - self.window_samples
+        ) // self.frame_samples
+        output = output[..., : n_frames.max()]
+        mask = sequence_mask(n_frames)
+        output[~mask] = False
 
         return output
+
+    @torch.no_grad()
+    def forward_segment(
+        self,
+        x: torch.Tensor,
+    ):
+        # The model expects stereo inputs
+        x = x.unsqueeze(1).expand(-1, 2, -1)
+        B, C, L = x.shape
+        assert L == self.segment_samples
+        x = self.model(x).mean(dim=-2)
+        return x
