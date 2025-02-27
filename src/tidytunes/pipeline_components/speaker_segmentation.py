@@ -105,16 +105,14 @@ def find_cluster_centers(embeddings: torch.Tensor, num_clusters):
 
 
 @lru_cache(maxsize=1)
-def load_speaker_encoder(
-    num_frames: int = 64, device: str = "cpu", tag: str = "v1.0.0"
-):
+def load_speaker_encoder(num_frames: int = 64, device: str = "cpu", tag: str = None):
     """
     Loads the speaker encoder model.
 
     Args:
         num_frames (int): Number of frames per input sample (default: 64).
         device (str): Device to run the model on (default: "cpu").
-        tag (str): Model version tag (default: "v1.0.0").
+        tag (str): Model version tag
 
     Returns:
         SpeakerEncoder: Pre-trained speaker encoder model.
@@ -123,7 +121,7 @@ def load_speaker_encoder(
     from tidytunes.models.external import ResNetSpeakerEncoder
     from tidytunes.utils.download import download_github
 
-    model_weights_path = download_github(tag, "coqui_speaker_encoder.pt")
+    model_weights_path = download_github("coqui_speaker_encoder.pt", tag)
     spk_enc = ResNetSpeakerEncoder.from_files(model_weights_path)
     spk_enc.num_input_frames = num_frames
     sampling_rate = spk_enc.sample_rate

@@ -81,13 +81,13 @@ def get_denoised_pesq(
 
 
 @lru_cache(maxsize=1)
-def load_denoiser(device: str = "cpu", tag: str = "v1.0.0"):
+def load_denoiser(device: str = "cpu", tag: str = None):
     """
     Load and cache the pre-trained denoiser model.
 
     Args:
         device (str): The device to load the model onto (default: "cpu").
-        tag (str): Github release tag associated with assets to load (default: "v1.0.0").
+        tag (str): Github release tag associated with assets to load
 
     Returns:
         AttenuateDenoiser: The loaded denoiser model.
@@ -95,7 +95,7 @@ def load_denoiser(device: str = "cpu", tag: str = "v1.0.0"):
     from tidytunes.models.external import AttenuateDenoiser
     from tidytunes.utils.download import download_github
 
-    model_weights_path = download_github(tag, "attenuate_weights.pt")
+    model_weights_path = download_github("attenuate_weights.pt", tag)
     model = AttenuateDenoiser.from_files(model_weights_path)
     model = model.eval().to(device)
 
