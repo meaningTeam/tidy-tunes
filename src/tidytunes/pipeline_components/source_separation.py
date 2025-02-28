@@ -2,13 +2,20 @@ from functools import lru_cache
 
 import torch
 
-from tidytunes.utils import Audio, collate_audios, frame_labels_to_time_segments
+from tidytunes.utils import (
+    Audio,
+    collate_audios,
+    frame_labels_to_time_segments,
+    to_batches,
+)
 
 
 def find_segments_without_music(
-    audios: list[Audio],
+    audio: list[Audio],
     min_duration: float = 6.4,
     device: str = "cpu",
+    batch_size: int = 1,
+    batch_duration: float = 36000.0,
 ):
     """
     Identifies segments in audio where speech is present but music is absent.
@@ -20,26 +27,34 @@ def find_segments_without_music(
         min_speech_energy (float): Minimum required energy for vocal sources to be considered speech (default: 0.99).
         min_duration (float): Minimum duration (in seconds) for valid speech segments (default: 6.4).
         device (str): The device to run the model on (default: "cpu").
+        batch_size (int): Maximal number of audio samples to process in a batch (default: 1).
+        batch_duration (float): Maximal duration of audio samples to process in a batch (default: 36000.0)
 
     Returns:
         list[list[Segment]]: List of speech segments without music for each input Audio.
     """
     demucs = load_demucs(device)
+    time_segments = []
 
-    audio, audio_lens = collate_audios(audios, demucs.sampling_rate)
-    audio, audio_lens = audio.to(device), audio_lens.to(device)
+    for audio_batch in to_batches(audio, batch_size, batch_duration):
 
-    with torch.no_grad():
-        speech_without_music_mask = demucs(audio, audio_lens)
+        a, al = collate_audios(audio_batch, demucs.sampling_rate)
+        with torch.no_grad():
+            speech_without_music_mask = demucs(a.to(device), al.to(device))
 
-    return [
-        frame_labels_to_time_segments(
-            m,
-            demucs.frame_shift,
-            filter_with=lambda x: (x.symbol is True) & (x.duration >= min_duration),
+        time_segments.extend(
+            [
+                frame_labels_to_time_segments(
+                    m,
+                    demucs.frame_shift,
+                    filter_with=lambda x: (x.symbol is True)
+                    & (x.duration >= min_duration),
+                )
+                for m in speech_without_music_mask
+            ]
         )
-        for m in speech_without_music_mask
-    ]
+
+    return time_segments
 
 
 @lru_cache(1)

@@ -1,6 +1,6 @@
 import torch
 
-from .audio import Segment
+from .audio import Audio, Segment
 
 
 def partition(lst: list, by: list, other: list | None = None) -> tuple[list, list]:
@@ -59,9 +59,30 @@ def frame_labels_to_time_segments(
     return segments
 
 
-def chunk_list(lst: list, chunk_size: int) -> list[list]:
+def to_batches(audios: list[Audio], max_size: int, max_duration: float) -> list[list]:
     """
-    Split input list `lst` into lists of length `chunk_size`. The last item can be
-    incomplete if the length of input is not divisible by chunk size.
+    Split input list `audios` into lists of length of at most `max_size`, but at
+    least 1, while containing Audio objects with duration of at most `max_duration`
+    (might be violated when a about to return only a single element).
     """
-    return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
+    assert max_size >= 1
+    assert max_duration > 0.0
+
+    batches, batch = [], []
+    for audio in audios:
+
+        if len(batch) == 0:
+            batch.append(audio)
+            continue
+
+        total_duration = sum(a.duration for a in batch)
+        if (len(batch) == max_size) or (total_duration + audio.duration > max_duration):
+            batches.append(batch)
+            batch = []
+
+        batch.append(audio)
+
+    if len(batch) > 0:
+        batches.append(batch)
+
+    return batches

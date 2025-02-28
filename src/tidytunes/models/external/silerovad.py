@@ -103,7 +103,11 @@ class SileroVAD(nn.Module, TraceMixin):
 
         x = audio_chunk_16khz.unsqueeze(1)
 
-        x = F.pad(x, (self.audio_padding_size, self.audio_padding_size), mode="reflect")
+        x = F.pad(
+            x.float().contiguous(),
+            (self.audio_padding_size, self.audio_padding_size),
+            mode="reflect",
+        )
         x = self.input_conv(x)
 
         a, b = torch.pow(x, 2).chunk(2, dim=1)

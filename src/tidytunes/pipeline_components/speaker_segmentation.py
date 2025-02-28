@@ -4,7 +4,12 @@ import torch
 import torch.nn.functional as F
 from sklearn.cluster import AgglomerativeClustering, KMeans
 
-from tidytunes.utils import Audio, collate_audios, frame_labels_to_time_segments
+from tidytunes.utils import (
+    Audio,
+    collate_audios,
+    frame_labels_to_time_segments,
+    to_batches,
+)
 
 
 def find_segments_with_single_speaker(
@@ -15,9 +20,12 @@ def find_segments_with_single_speaker(
     frame_shift: int = 64,
     num_clusters: int = 10,
     device: str = "cpu",
+    batch_size: int = 64,
+    batch_duration: float = 1280.0,
 ):
     """
     Identifies segments in the audio where only a single speaker is present.
+    *** All input segments are supposed to come from a single source. ***
 
     Args:
         audio (list[Audio]): List of audio objects.
@@ -27,23 +35,24 @@ def find_segments_with_single_speaker(
         frame_shift (float): Number of model input frames per one output speaker label (default: 64).
         num_clusters (int): Initial number of clusters before agglomertive clustering (defailt: 10).
         device (str): Device to run the model on (default: "cpu").
+        batch_size (int): Maximal number of audio samples to process in a batch (default: 64).
+        batch_duration (float): Maximal duration of audio samples to process in a batch (default: 1280.0)
 
     Returns:
         list[list[Segment]]: List of speaker segments for each input audio.
     """
     speaker_encoder = load_speaker_encoder(num_frames=frame_shift, device=device)
+    embeddings = []
 
-    audio, audio_lens = collate_audios(
-        audio, sampling_rate=speaker_encoder.sampling_rate
-    )
-    audio, audio_lens = audio.to(device), audio_lens.to(device)
+    for audio_batch in to_batches(audio, batch_size, batch_duration):
 
-    with torch.no_grad():
-        embeddings = speaker_encoder(audio, audio_lens)
-        embeddings_all = torch.cat(embeddings, dim=0)
+        a, al = collate_audios(audio_batch, sampling_rate=speaker_encoder.sampling_rate)
+        with torch.no_grad():
+            e = speaker_encoder(a.to(device), al.to(device))
+        embeddings.extend(e)
 
+    embeddings_all = torch.cat(embeddings, dim=0)
     centroids = find_cluster_centers(embeddings_all, num_clusters)
-
     labels = [
         F.cosine_similarity(e.unsqueeze(1), centroids.unsqueeze(0), dim=-1).argmax(
             dim=-1

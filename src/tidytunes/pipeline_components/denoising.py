@@ -5,15 +5,18 @@ from pesq import PesqError, pesq
 
 from tidytunes.utils import (
     Audio,
-    chunk_list,
     collate_audios,
     decollate_audios,
     sequence_mask,
+    to_batches,
 )
 
 
 def denoise(
-    audio: list[Audio], device: str = "cpu", batch_size: int = 32
+    audio: list[Audio],
+    device: str = "cpu",
+    batch_size: int = 64,
+    batch_duration: float = 1280.0,
 ) -> list[Audio]:
     """
     Apply denoising to a list of audio samples using a pre-trained model.
@@ -21,7 +24,8 @@ def denoise(
     Args:
         audio (list[Audio]): List of audio objects to be denoised.
         device (str): The device to run the denoising model on (default: "cpu").
-        batch_size (int): Number of audio samples to process in a batch (default: 32).
+        batch_size (int): Maximal number of audio samples to process in a batch (default: 64).
+        batch_duration (float): Maximal duration of audio samples to process in a batch (default: 1280.0)
 
     Returns:
         list[Audio]: List of denoised audio objects.
@@ -29,7 +33,7 @@ def denoise(
     denoiser = load_denoiser(device)
     denoised = []
 
-    for audio_batch in chunk_list(audio, batch_size):
+    for audio_batch in to_batches(audio, batch_size, batch_duration):
         audio_tensor, audio_lengths = collate_audios(
             audio_batch, denoiser.sampling_rate
         )
