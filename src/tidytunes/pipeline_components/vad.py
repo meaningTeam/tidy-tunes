@@ -77,6 +77,5 @@ def load_vad(device: str = "cpu", tag: str = "v1.0.0"):
 
     model_weights_path = download_github(tag, "silerovad_weights.pt")
     vad = SileroVAD.from_files(model_weights_path)
-    # vad_trace = vad.to_jit_trace(device)
-    vad_trace = vad.eval().to(device)
+    vad_trace = vad.to_jit_trace(device)
     return VoiceActivityDetector(vad_trace).to(device)
