@@ -38,14 +38,13 @@ def get_language_probabilities(
 
 
 @lru_cache(1)
-def load_langid_voxlingua107_ecapa(device: str = "cpu", tag: str = "v1.0.0"):
+def load_langid_voxlingua107_ecapa(device: str = "cpu", tag: str = None):
     """
     Loads, traces, and caches the pre-trained VoxLingua107 ECAPA model for spoken language identification.
 
     Args:
         device (str): The device to load the model on (default: "cpu").
-        tag (str): Github release tag associated with assets to load (default: "v1.0.0").
-
+        tag (str): Github release tag associated with assets to load
     Returns:
         Tuple: A traced model and a dictionary mapping language labels to indices.
     """
@@ -53,10 +52,10 @@ def load_langid_voxlingua107_ecapa(device: str = "cpu", tag: str = "v1.0.0"):
     from tidytunes.utils.download import download_github
 
     model = SpokenLanguageIdentificationModel.from_files(
-        download_github(tag, "lang_id_voxlingua107_ecapa_classifier.pt"),
-        download_github(tag, "lang_id_voxlingua107_ecapa_embedding_model.pt"),
-        download_github(tag, "lang_id_voxlingua107_ecapa_normalizer.pt"),
-        download_github(tag, "lang_id_voxlingua107_ecapa_label_to_language.json"),
+        download_github("lang_id_voxlingua107_ecapa_classifier.pt", tag),
+        download_github("lang_id_voxlingua107_ecapa_embedding_model.pt", tag),
+        download_github("lang_id_voxlingua107_ecapa_normalizer.pt", tag),
+        download_github("lang_id_voxlingua107_ecapa_label_to_language.json", tag),
     )
     model_trace = model.to_jit_trace(device)
     return model_trace, model.lab2ind

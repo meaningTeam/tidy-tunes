@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tidytunes"
-version = "1.0.0"
+version = "1.0.1"
 description = "An easy-to-use pipeline for mining high-quality audio data for speech generation models."
 readme = "README.md"
 authors = [

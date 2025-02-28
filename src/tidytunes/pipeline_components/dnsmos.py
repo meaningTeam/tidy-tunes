@@ -44,7 +44,7 @@ def load_dnsmos_model(
     device: str = "cpu",
     personalized: bool = True,
     num_threads: int | None = None,
-    tag: str = "v1.0.0",
+    tag: str = None,
 ):
     """
     Loads and caches the DNSMOS model for speech quality assessment.
@@ -53,7 +53,7 @@ def load_dnsmos_model(
         device (str): The device to run the model on (default: "cpu").
         personalized (bool): Whether to use a personalized model (default: True).
         num_threads (int | None): Number of threads to use for ONNX inference (default: None).
-        tag (str): Version tag for downloading model weights (default: "v1.0.0").
+        tag (str): Version tag for downloading model weights
 
     Returns:
         DNSMOSPredictor: Loaded DNSMOS model ready for inference.
@@ -65,8 +65,8 @@ def load_dnsmos_model(
     device = torch.device(device)
     prefix = "p_" if personalized else ""
 
-    dnsmos_onnx_path = download_github(tag, f"dnsmos_{prefix}sig_bak_ovr.onnx")
-    p808_onnx_path = download_github(tag, "dnsmos_model_v8.onnx")
+    dnsmos_onnx_path = download_github(f"dnsmos_{prefix}sig_bak_ovr.onnx", tag)
+    p808_onnx_path = download_github("dnsmos_model_v8.onnx", tag)
     dnsmos_sess = load_onnx_session(dnsmos_onnx_path, device, num_threads)
     p808_sess = load_onnx_session(p808_onnx_path, device, num_threads)
 

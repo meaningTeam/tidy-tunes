@@ -95,7 +95,7 @@ If used, please cite it as follows:
   title = {Tidy Tunes: An Easy-to-Use Pipeline for Mining High-Quality Audio Data},
   year = {2025},
   howpublished = {\url{https://github.com/meaningTeam/tidy-tunes}},
-  note = {Version 1.0.0}
+  note = {Version 1.0.1}
 }
 ```
 

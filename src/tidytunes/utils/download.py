@@ -1,3 +1,4 @@
+from importlib.metadata import version
 from pathlib import Path
 
 import requests
@@ -5,17 +6,21 @@ from platformdirs import user_cache_dir
 from tqdm import tqdm
 
 
-def download_github(tag: str, filename: str) -> Path:
+def download_github(filename: str, tag: str = None) -> Path:
     """
     Downloads an artifact from a GitHub release and caches it locally.
 
     Args:
-        tag (str): GitHub release tag.
         filename (str): Name of the file in the release.
+        tag (str): GitHub release tag.
 
     Returns:
         Path: Path to the downloaded or cached file.
     """
+
+    if tag is None:
+        tag = "v" + version("tidytunes")
+
     cache_dir = Path(user_cache_dir("tidytunes", version=tag))
     cache_dir.mkdir(parents=True, exist_ok=True)
 
