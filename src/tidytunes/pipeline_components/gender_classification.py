@@ -3,14 +3,13 @@ from functools import lru_cache
 import torch
 
 from tidytunes.pipeline_components.speaker_segmentation import load_speaker_encoder
-from tidytunes.utils import Audio, collate_audios, to_batches
+from tidytunes.utils import Audio, batched, collate_audios
 
 
+@batched(batch_size=1024, batch_duration=1280.0)
 def is_male(
     audio: list[Audio],
     device: str = "cpu",
-    batch_size: int = 64,
-    batch_duration: float = 1280.0,
 ):
     """
     Classifies gender of the speaker in the input audios
@@ -18,8 +17,6 @@ def is_male(
     Args:
         audio (list[Audio]): List of audio objects.
         device (str): Device to run the model on (default: "cpu").
-        batch_size (int): Maximal number of audio samples to process in a batch (default: 64).
-        batch_duration (float): Maximal duration of audio samples to process in a batch (default: 1280.0)
 
     Returns:
         list[bool]: List of booleans for each input audio, True for males, False for females.
@@ -27,19 +24,13 @@ def is_male(
 
     speaker_encoder = load_speaker_encoder(device=device)
     model = load_gender_classification_model()
-    embeddings = []
 
-    for audio_batch in to_batches(audio, batch_size, batch_duration):
-
-        a, al = collate_audios(audio_batch, sampling_rate=speaker_encoder.sampling_rate)
-        with torch.no_grad():
-            be = speaker_encoder(a.to(device), al.to(device))
-        embeddings.extend([e.mean(dim=0) for e in be])
-
+    a, al = collate_audios(audio, sampling_rate=speaker_encoder.sampling_rate)
+    with torch.no_grad():
+        embeddings = speaker_encoder(a.to(device), al.to(device))
     classifications = [
-        model.predict(e.cpu().numpy().reshape(1, -1)) for e in embeddings
+        model.predict(e.mean(dim=0).cpu().numpy().reshape(1, -1)) for e in embeddings
     ]
-
     return [c == 1 for c in classifications]
 
 

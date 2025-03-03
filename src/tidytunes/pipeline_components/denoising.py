@@ -5,18 +5,17 @@ from pesq import PesqError, pesq
 
 from tidytunes.utils import (
     Audio,
+    batched,
     collate_audios,
     decollate_audios,
     sequence_mask,
-    to_batches,
 )
 
 
+@batched(batch_size=1024, batch_duration=1280.0)
 def denoise(
     audio: list[Audio],
     device: str = "cpu",
-    batch_size: int = 64,
-    batch_duration: float = 1280.0,
 ) -> list[Audio]:
     """
     Apply denoising to a list of audio samples using a pre-trained model.
@@ -24,39 +23,28 @@ def denoise(
     Args:
         audio (list[Audio]): List of audio objects to be denoised.
         device (str): The device to run the denoising model on (default: "cpu").
-        batch_size (int): Maximal number of audio samples to process in a batch (default: 64).
-        batch_duration (float): Maximal duration of audio samples to process in a batch (default: 1280.0)
 
     Returns:
         list[Audio]: List of denoised audio objects.
     """
     denoiser = load_denoiser(device)
-    denoised = []
 
-    for audio_batch in to_batches(audio, batch_size, batch_duration):
-        audio_tensor, audio_lengths = collate_audios(
-            audio_batch, denoiser.sampling_rate
-        )
-        mask = sequence_mask(audio_lengths.to(device))
-        with torch.no_grad():
-            denoised_audio = denoiser(audio_tensor.to(device), mask)
-        denoised.extend(
-            decollate_audios(
-                denoised_audio,
-                audio_lengths,
-                denoiser.sampling_rate,
-                origin_like=audio_batch,
-            )
-        )
-
-    return denoised
+    audio_tensor, audio_lengths = collate_audios(audio, denoiser.sampling_rate)
+    mask = sequence_mask(audio_lengths.to(device))
+    with torch.no_grad():
+        denoised_audio = denoiser(audio_tensor.to(device), mask)
+    return decollate_audios(
+        denoised_audio,
+        audio_lengths,
+        denoiser.sampling_rate,
+        origin_like=audio,
+    )
 
 
 def get_denoised_pesq(
     audio: list[Audio],
     sampling_rate: int = 16000,
     device: str = "cpu",
-    batch_size: int = 32,
 ) -> torch.Tensor:
     """
     Compute the Perceptual Evaluation of Speech Quality (PESQ) score between original and denoised audio.
@@ -65,12 +53,11 @@ def get_denoised_pesq(
         audio (list[Audio]): List of audio objects to be denoised.
         sampling_rate (int): The target sampling rate for PESQ computation (default: 16000 Hz).
         device (str): The device to run the denoising model on (default: "cpu").
-        batch_size (int): Number of audio samples to process in a batch (default: 32).
 
     Returns:
         torch.Tensor: Tensor containing PESQ scores for each input Audio.
     """
-    denoised = denoise(audio, device, batch_size)
+    denoised = denoise(audio, device)
     return torch.tensor(
         [
             pesq(
