@@ -18,6 +18,7 @@ class OriginMetadata:
     id: str
     start: float = 0.0
     end: float | None = None
+    path: Path | None = None
 
 
 @dataclass
@@ -77,8 +78,13 @@ class Audio:
         if audio.shape[0] > 1:
             audio = audio.mean(0)
 
-        audio_obj = cls.from_array(audio, sr, OriginMetadata(id, start, end))
+        audio_obj = cls.from_array(audio, sr, OriginMetadata(id, start, end, pth))
         return audio_obj.resample(sampling_rate) if sampling_rate else audio_obj
+
+    @property
+    def id(self):
+        assert self.origin is not None, "Origin metadata is required."
+        return f"{self.origin.id}{SEP}{int(self.origin.start)}{SEP}{int(self.origin.end or 0)}"
 
     def to_file(
         self, root: str | Path | None = None, path: str | Path | None = None
@@ -102,10 +108,7 @@ class Audio:
             assert (
                 self.origin is not None
             ), "Origin metadata is required when using root."
-            path = (
-                Path(root)
-                / f"{self.origin.id}{SEP}{int(self.origin.start)}{SEP}{int(self.origin.end or 0)}.flac"
-            )
+            path = Path(root) / f"{self.id}.flac"
 
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)

@@ -130,27 +130,6 @@ def compute_mean_embeddings(audio: list[Audio], device: str = "cpu"):
     return embeddings_mean
 
 
-def cluster_speaker_embeddings(audios: list[Audio], embeddings: list[np.ndarray]):
-    """
-    Cluster audios by speaker embeddings. Some audios can be discarded.
-
-    Args:
-        audios: List of Audio objects
-        embeddings: List of embeddings for each audio
-
-    Returns:
-        Dict[int, list[Audio]]: Clustered audios by
-    """
-    import hdbscan
-
-    labels = hdbscan.HDBSCAN().fit(embeddings)
-    results = defaultdict(list)
-    for audio, label in zip(audios, labels):
-        if label != -1:
-            results[label].append(audio)
-    return results
-
-
 @lru_cache(maxsize=1)
 def load_speaker_encoder(num_frames: int = 64, device: str = "cpu", tag: str = None):
     """
