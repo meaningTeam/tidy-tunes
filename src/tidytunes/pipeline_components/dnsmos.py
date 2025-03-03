@@ -24,11 +24,13 @@ def get_dnsmos(
     Returns:
         torch.Tensor: Tensor containing DNSMOS scores for each input audio clip.
     """
+
     model = load_dnsmos_model(device, personalized, num_threads)
 
     a, al = collate_audios(audio, model.sampling_rate)
     with torch.no_grad():
         _, _, _, mos = model(a.to(device), al.to(device))
+
     return torch.unbind(mos)
 
 

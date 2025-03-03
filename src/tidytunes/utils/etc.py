@@ -80,7 +80,7 @@ def to_batches(audios: list[Audio], max_size: int, max_duration: float) -> list[
             batch.append(audio)
             continue
 
-        total_duration = max(a.duration for a in (batch + audio)) * (len(batch) + 1)
+        total_duration = max(a.duration for a in (batch + [audio])) * (len(batch) + 1)
         if (len(batch) == max_size) or (total_duration > max_duration):
             batches.append(batch)
             batch = []
@@ -121,6 +121,9 @@ class SpeculativeBatcher:
     def _decrease(self):
         self.max_duration *= self.backoff_factor
 
+    def __enter__(self):
+        return self
+
     def __exit__(self, exc_type, exc_value, traceback):
         if is_oom_error(exc_value):
             self._decrease()
@@ -156,7 +159,7 @@ def batched(batch_size, batch_duration):
                     outputs = []
                     for batch in batcher(audio):
                         bound_args.arguments["audio"] = batch
-                        o = func(*bound_args.args, **bound_args.kwargs, batcher=batcher)
+                        o = func(*bound_args.args, **bound_args.kwargs)
                         outputs.extend(o)
                     return outputs
             else:

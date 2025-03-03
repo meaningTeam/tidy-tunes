@@ -36,12 +36,16 @@ def process_audio(audios, device, pipeline_components):
 
     for name, func, kwargs, filter_fn in pipeline_components:
 
+        print(name)
+
         # to improve batching efficiency
         audio_segments = sorted(audio_segments, key=lambda x: x.duration)
 
         values = func(audio_segments, device=device, **kwargs)
         if filter_fn:
-            audio_segments, _ = partition(audio_segments, by=filter_fn(values))
+            audio_segments, _ = partition(
+                audio_segments, by=[filter_fn(v) for v in values]
+            )
         else:
             audio_segments = trim_audios(audio_segments, values)
 

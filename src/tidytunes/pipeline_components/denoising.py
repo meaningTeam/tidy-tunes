@@ -58,17 +58,15 @@ def get_denoised_pesq(
         torch.Tensor: Tensor containing PESQ scores for each input Audio.
     """
     denoised = denoise(audio, device)
-    return torch.tensor(
-        [
-            pesq(
-                sampling_rate,
-                ref.resample(sampling_rate).as_tensor().cpu().numpy(),
-                enh.resample(sampling_rate).as_tensor().cpu().numpy(),
-                on_error=PesqError.RETURN_VALUES,
-            )
-            for ref, enh in zip(audio, denoised)
-        ]
-    )
+    return [
+        pesq(
+            sampling_rate,
+            ref.resample(sampling_rate).as_tensor().cpu().numpy(),
+            enh.resample(sampling_rate).as_tensor().cpu().numpy(),
+            on_error=PesqError.RETURN_VALUES,
+        )
+        for ref, enh in zip(audio, denoised)
+    ]
 
 
 @lru_cache(maxsize=1)

@@ -39,7 +39,7 @@ def find_segments_with_single_speaker(
     """
 
     embeddings = get_speaker_embeddings(audio, frame_shift, device)
-    embeddings_all = torch.stack(embeddings, dim=0)
+    embeddings_all = torch.cat(embeddings, dim=0)
 
     centroids = find_cluster_centers(embeddings_all, num_clusters)
     labels = [
@@ -80,7 +80,7 @@ def get_speaker_embeddings(
     a, al = collate_audios(audio, sampling_rate=speaker_encoder.sampling_rate)
     with torch.no_grad():
         e = speaker_encoder(a.to(device), al.to(device))
-    return torch.unbind(e)
+    return e
 
 
 def find_cluster_centers(embeddings: torch.Tensor, num_clusters):
