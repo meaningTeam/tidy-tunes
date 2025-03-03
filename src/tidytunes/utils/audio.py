@@ -78,7 +78,9 @@ class Audio:
         if audio.shape[0] > 1:
             audio = audio.mean(0)
 
-        audio_obj = cls.from_array(audio, sr, OriginMetadata(id, start, end, pth))
+        audio_obj = cls.from_array(
+            audio, sr, OriginMetadata(id, start, end, pth.absolute())
+        )
         return audio_obj.resample(sampling_rate) if sampling_rate else audio_obj
 
     @property
