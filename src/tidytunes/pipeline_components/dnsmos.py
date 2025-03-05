@@ -2,7 +2,7 @@ from functools import lru_cache
 
 import torch
 
-from tidytunes.utils import Audio, chunk_list, collate_audios
+from tidytunes.utils import Audio, collate_audios, to_batches
 
 
 def get_dnsmos(
@@ -11,6 +11,7 @@ def get_dnsmos(
     device: str = "cpu",
     num_threads: int | None = 8,
     batch_size: int = 32,
+    batch_duration: float = 640.0,
 ) -> torch.Tensor:
     """
     Computes DNSMOS (Deep Noise Suppression Mean Opinion Score) for a batch of audio clips.
@@ -20,7 +21,8 @@ def get_dnsmos(
         personalized (bool): Whether to use a personalized model (default: True).
         device (str): The device to run the model on (default: "cpu").
         num_threads (int | None): Number of threads to use for ONNX inference (default: 8).
-        batch_size (int): Batch size for processing (default: 32).
+        batch_size (int): Maximal number of audio samples to process in a batch (default: 32).
+        batch_duration (float): Maximal duration of audio samples to process in a batch (default: 640.0)
 
     Returns:
         torch.Tensor: Tensor containing DNSMOS scores for each input audio clip.
@@ -28,7 +30,7 @@ def get_dnsmos(
     model = load_dnsmos_model(device, personalized, num_threads)
     mos_scores = []
 
-    for audio_batch in chunk_list(audio, batch_size):
+    for audio_batch in to_batches(audio, batch_size, batch_duration):
         a, al = collate_audios(audio_batch, model.sampling_rate)
         with torch.no_grad():
             _, _, _, mos = model(a.to(device), al.to(device))
