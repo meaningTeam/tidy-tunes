@@ -3,6 +3,7 @@ from functools import lru_cache
 import torch
 
 from tidytunes.utils import Audio
+from tidytunes.utils.memory import is_cufft_snafu
 
 
 def get_rolloff_frequency(
@@ -24,8 +25,21 @@ def get_rolloff_frequency(
     for a in audio:
         w = a.as_tensor().to(device)
         extractor = get_rolloff_extractor(a.sampling_rate, roll_percent, device)
-        with torch.no_grad():
-            rolloff = extractor(w)
+
+        num_retry = 2
+        for attempt in range(num_retry):
+            try:
+                with torch.no_grad():
+                    rolloff = extractor(w)
+            except RuntimeError as e:
+                if not is_cufft_snafu(e):
+                    raise
+                if attempt == 0:
+                    torch.cuda.empty_cache()
+                    torch.backends.cuda.cufft_plan_cache.clear()
+                else:
+                    raise
+
         frequencies.append(rolloff)
     return torch.stack(frequencies)
 

@@ -8,6 +8,7 @@ def is_oom_error(exception: BaseException) -> bool:
         is_cuda_out_of_memory(exception)
         or is_cudnn_snafu(exception)
         or is_out_of_cpu_memory(exception)
+        or is_onnx_out_of_memory(exception)
     )
 
 
@@ -28,11 +29,27 @@ def is_cudnn_snafu(exception: BaseException) -> bool:
     )
 
 
+def is_cufft_snafu(exception: BaseException) -> bool:
+    return (
+        isinstance(exception, RuntimeError)
+        and len(exception.args) == 1
+        and "cuFFT error: CUFFT_INTERNAL_ERROR" in exception.args[0]
+    )
+
+
 def is_out_of_cpu_memory(exception: BaseException) -> bool:
     return (
         isinstance(exception, RuntimeError)
         and len(exception.args) == 1
         and "DefaultCPUAllocator: can't allocate memory" in exception.args[0]
+    )
+
+
+def is_onnx_out_of_memory(exception: BaseException) -> bool:
+    return (
+        isinstance(exception, RuntimeError)
+        and len(exception.args) == 1
+        and "Failed to allocate memory" in exception.args[0]
     )
 
 

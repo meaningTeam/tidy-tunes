@@ -36,8 +36,6 @@ def process_audio(audios, device, pipeline_components):
 
     for name, func, kwargs, filter_fn in pipeline_components:
 
-        print(name)
-
         # to improve batching efficiency
         audio_segments = sorted(audio_segments, key=lambda x: x.duration)
 
