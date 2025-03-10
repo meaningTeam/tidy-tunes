@@ -41,7 +41,9 @@ def process_audio(audios, device, pipeline_components):
 
         values = func(audio_segments, device=device, **kwargs)
         if filter_fn:
-            audio_segments, _ = partition(audio_segments, by=filter_fn(values))
+            audio_segments, _ = partition(
+                audio_segments, by=[filter_fn(v) for v in values]
+            )
         else:
             audio_segments = trim_audios(audio_segments, values)
 

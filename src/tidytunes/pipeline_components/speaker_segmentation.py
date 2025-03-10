@@ -6,9 +6,9 @@ from sklearn.cluster import AgglomerativeClustering, KMeans
 
 from tidytunes.utils import (
     Audio,
+    batched,
     collate_audios,
     frame_labels_to_time_segments,
-    to_batches,
 )
 
 
@@ -41,15 +41,9 @@ def find_segments_with_single_speaker(
     Returns:
         list[list[Segment]]: List of speaker segments for each input audio.
     """
-    speaker_encoder = load_speaker_encoder(num_frames=frame_shift, device=device)
-    embeddings = []
 
-    for audio_batch in to_batches(audio, batch_size, batch_duration):
-
-        a, al = collate_audios(audio_batch, sampling_rate=speaker_encoder.sampling_rate)
-        with torch.no_grad():
-            e = speaker_encoder(a.to(device), al.to(device))
-        embeddings.extend(e)
+    embeddings = get_speaker_embeddings(audio, frame_shift, device)
+    embeddings_all = torch.cat(embeddings, dim=0)
 
     embeddings_all = torch.cat(embeddings, dim=0)
     centroids = find_cluster_centers(embeddings_all, num_clusters)
@@ -60,6 +54,7 @@ def find_segments_with_single_speaker(
         for e in embeddings
     ]
 
+    speaker_encoder = load_speaker_encoder(num_frames=frame_shift, device=device)
     frame_shift_seconds = (
         frame_shift * speaker_encoder.hop_length / speaker_encoder.sampling_rate
     )
@@ -80,6 +75,17 @@ def find_segments_with_single_speaker(
                 t.duration -= segment_end_shift
 
     return time_segments
+
+
+@batched(batch_size=1024, batch_duration=1280.0)
+def get_speaker_embeddings(
+    audio: list[Audio], frame_shift: int = 64, device: str = "cpu"
+):
+    speaker_encoder = load_speaker_encoder(num_frames=frame_shift, device=device)
+    a, al = collate_audios(audio, sampling_rate=speaker_encoder.sampling_rate)
+    with torch.no_grad():
+        e = speaker_encoder(a.to(device), al.to(device))
+    return e
 
 
 def find_cluster_centers(embeddings: torch.Tensor, num_clusters):
