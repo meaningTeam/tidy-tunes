@@ -23,6 +23,7 @@ def get_language_probabilities(
         Tensor (B,) of probabilities for the specified language.
     """
     model, lab2ind = load_langid_voxlingua107_ecapa(device)
+    lang_probs = []
 
     audio_16khz, audio_16khz_lens = collate_audios(audio, 16000)
     with torch.no_grad():

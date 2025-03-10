@@ -24,6 +24,7 @@ def is_male(
 
     speaker_encoder = load_speaker_encoder(device=device)
     model = load_gender_classification_model()
+    embeddings = []
 
     a, al = collate_audios(audio, sampling_rate=speaker_encoder.sampling_rate)
     with torch.no_grad():

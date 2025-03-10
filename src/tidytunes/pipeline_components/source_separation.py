@@ -31,6 +31,7 @@ def find_segments_without_music(
         list[list[Segment]]: List of speech segments without music for each input Audio.
     """
     demucs = load_demucs(device)
+    time_segments = []
 
     a, al = collate_audios(audio, demucs.sampling_rate)
     with torch.no_grad():

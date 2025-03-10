@@ -16,6 +16,8 @@ def find_segments_with_speech(
     min_duration: float = 3.2,
     max_duration: float = 30.0,
     device: str = "cpu",
+    batch_size: int = 64,
+    batch_duration: float = 1280.0,
 ):
     """
     Identifies speech segments in the given audio using a Voice Activity Detector (VAD).
@@ -25,6 +27,8 @@ def find_segments_with_speech(
         min_duration (float): Minimum duration for a valid speech segment (default: 3.2).
         max_duration (float): Maximum duration for a valid speech segment (default: 30.0).
         device (str): The device to run the VAD model on (default: "cpu").
+        batch_size (int): Maximal number of audio samples to process in a batch (default: 64).
+        batch_duration (float): Maximal duration of audio samples to process in a batch (default: 1280.0)
 
     Returns:
         list[list[Segment]]: Time segments containing speech for each input Audio.

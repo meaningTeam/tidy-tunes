@@ -20,6 +20,8 @@ def find_segments_with_single_speaker(
     frame_shift: int = 64,
     num_clusters: int = 10,
     device: str = "cpu",
+    batch_size: int = 64,
+    batch_duration: float = 1280.0,
 ):
     """
     Identifies segments in the audio where only a single speaker is present.
@@ -33,6 +35,8 @@ def find_segments_with_single_speaker(
         frame_shift (float): Number of model input frames per one output speaker label (default: 64).
         num_clusters (int): Initial number of clusters before agglomertive clustering (defailt: 10).
         device (str): Device to run the model on (default: "cpu").
+        batch_size (int): Maximal number of audio samples to process in a batch (default: 64).
+        batch_duration (float): Maximal duration of audio samples to process in a batch (default: 1280.0)
 
     Returns:
         list[list[Segment]]: List of speaker segments for each input audio.
@@ -41,6 +45,7 @@ def find_segments_with_single_speaker(
     embeddings = get_speaker_embeddings(audio, frame_shift, device)
     embeddings_all = torch.cat(embeddings, dim=0)
 
+    embeddings_all = torch.cat(embeddings, dim=0)
     centroids = find_cluster_centers(embeddings_all, num_clusters)
     labels = [
         F.cosine_similarity(e.unsqueeze(1), centroids.unsqueeze(0), dim=-1).argmax(
