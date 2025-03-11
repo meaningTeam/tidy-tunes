@@ -1,5 +1,7 @@
+from collections import defaultdict
 from functools import lru_cache
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 from sklearn.cluster import AgglomerativeClustering, KMeans
@@ -111,6 +113,30 @@ def find_cluster_centers(embeddings: torch.Tensor, num_clusters):
     centroids = centroids.to(embeddings.device)
 
     return centroids
+
+
+def compute_mean_embeddings(audio: list[Audio], device: str = "cpu"):
+    """
+    Computes mean embeddings for the given audio.
+
+    Args:
+        audio (list[Audio]): List of audio objects.
+        device (str): Device to run the model on (default: "cpu").
+
+    Returns:
+        list[np.ndarray]: List of mean embeddings for each input audio.
+    """
+    speaker_encoder = load_speaker_encoder(device=device)
+    audio, audio_lens = collate_audios(
+        audio, sampling_rate=speaker_encoder.sampling_rate
+    )
+    audio, audio_lens = audio.to(device), audio_lens.to(device)
+
+    with torch.no_grad():
+        embeddings = speaker_encoder(audio, audio_lens)
+        embeddings_mean = [e.mean(dim=0).cpu().numpy() for e in embeddings]
+
+    return embeddings_mean
 
 
 @lru_cache(maxsize=1)
