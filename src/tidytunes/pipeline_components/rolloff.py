@@ -3,7 +3,7 @@ from functools import lru_cache
 import torch
 
 from tidytunes.utils import Audio
-from tidytunes.utils.memory import is_cufft_snafu
+from tidytunes.utils.memory import garbage_collection_cuda, is_cufft_snafu
 
 
 def get_rolloff_frequency(
@@ -35,8 +35,7 @@ def get_rolloff_frequency(
                 if not is_cufft_snafu(e):
                     raise
                 if attempt == 0:
-                    torch.cuda.empty_cache()
-                    torch.backends.cuda.cufft_plan_cache.clear()
+                    garbage_collection_cuda()
                 else:
                     raise
 

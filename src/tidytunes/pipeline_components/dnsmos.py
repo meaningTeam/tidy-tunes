@@ -5,7 +5,7 @@ import torch
 from tidytunes.utils import Audio, batched, collate_audios
 
 
-@batched(batch_size=1024, batch_duration=1280.0)
+@batched(batch_size=64, batch_duration=1280.0)
 def get_dnsmos(
     audio: list[Audio],
     personalized: bool = True,

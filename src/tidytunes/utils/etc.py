@@ -1,11 +1,12 @@
 import inspect
+import traceback as tb
 from functools import wraps
 from typing import Any
 
 import torch
 
 from .audio import Audio, Segment
-from .memory import is_oom_error
+from .memory import garbage_collection_cuda, is_cufft_snafu, is_oom_error
 
 
 def partition(lst: list, by: list, other: list | None = None) -> tuple[list, list]:
@@ -125,9 +126,13 @@ class SpeculativeBatcher:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        if is_oom_error(exc_value):
+        if exc_value is not None and is_cufft_snafu(exc_value):
+            garbage_collection_cuda()
+            return True
+        if exc_value is not None and is_oom_error(exc_value):
             self._decrease()
             self._reset_counter()
+            garbage_collection_cuda()
             return True
         self.counter -= 1
         if self.counter <= 0:
@@ -154,7 +159,7 @@ def batched(batch_size, batch_duration):
             bound_args.apply_defaults()
             audio = bound_args.arguments["audio"]
 
-            for _ in range(num_retries):
+            for i in range(num_retries):
                 with batcher:
                     outputs = []
                     for batch in batcher(audio):
@@ -163,7 +168,9 @@ def batched(batch_size, batch_duration):
                         outputs.extend(o)
                     return outputs
             else:
-                raise RuntimeError("OOM, failed to find a suitable batch size!")
+                raise RuntimeError(
+                    "CUDA out of memory, failed to find a suitable batch size!"
+                )
 
         return wrapper
 
