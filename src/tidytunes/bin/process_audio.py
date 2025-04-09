@@ -17,6 +17,7 @@ from tidytunes.pipeline_components import (
 )
 from tidytunes.pipeline_components.dnsmos import load_dnsmos_model
 from tidytunes.utils import Audio, partition, setup_logger, trim_audios
+from tidytunes.utils.memory import garbage_collection_cuda, is_cuda_out_of_memory
 
 PIPELINE_FUNCTIONS = {
     "voice_separation": find_segments_without_music,
@@ -39,11 +40,24 @@ def process_audio(audios, device, pipeline_components):
         # to improve batching efficiency
         audio_segments = sorted(audio_segments, key=lambda x: x.duration)
 
-        values = func(audio_segments, device=device, **kwargs)
-        if filter_fn:
-            audio_segments, _ = partition(audio_segments, by=filter_fn(values))
-        else:
-            audio_segments = trim_audios(audio_segments, values)
+        try:
+            values = func(audio_segments, device=device, **kwargs)
+            if filter_fn:
+                audio_segments, _ = partition(
+                    audio_segments, by=[filter_fn(v) for v in values]
+                )
+            else:
+                audio_segments = trim_audios(audio_segments, values)
+        except RuntimeError as e:
+            if not is_cuda_out_of_memory(e):
+                raise
+            garbage_collection_cuda()
+            audio_segments = []
+            click.secho(
+                "Failed to process a possibly too large audio file! Skipping ...",
+                fg="red",
+                bold=True,
+            )
 
         throughput_stats[name] = sum(a.duration for a in audio_segments)
         if not audio_segments:

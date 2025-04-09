@@ -4,19 +4,18 @@ import torch
 
 from tidytunes.utils import (
     Audio,
+    batched,
     collate_audios,
     frame_labels_to_time_segments,
-    to_batches,
 )
 
 
+@batched(batch_size=1024, batch_duration=1280.0)
 def find_segments_with_speech(
     audio: list[Audio],
     min_duration: float = 3.2,
     max_duration: float = 30.0,
     device: str = "cpu",
-    batch_size: int = 64,
-    batch_duration: float = 1280.0,
 ):
     """
     Identifies speech segments in the given audio using a Voice Activity Detector (VAD).
@@ -26,37 +25,26 @@ def find_segments_with_speech(
         min_duration (float): Minimum duration for a valid speech segment (default: 3.2).
         max_duration (float): Maximum duration for a valid speech segment (default: 30.0).
         device (str): The device to run the VAD model on (default: "cpu").
-        batch_size (int): Maximal number of audio samples to process in a batch (default: 64).
-        batch_duration (float): Maximal duration of audio samples to process in a batch (default: 1280.0)
 
     Returns:
         list[list[Segment]]: Time segments containing speech for each input Audio.
     """
     vad = load_vad(device)
-    time_segments = []
 
-    for audio_batch in to_batches(audio, batch_size, batch_duration):
+    audio_tensor, _ = collate_audios(audio, vad.sampling_rate)
+    with torch.no_grad():
+        speech_mask = vad(audio_tensor.to(device))
+    speech_mask[..., :-1] += speech_mask[..., 1:].clone()  # Pre-bounce speech starts
 
-        audio_tensor, _ = collate_audios(audio_batch, vad.sampling_rate)
-        with torch.no_grad():
-            speech_mask = vad(audio_tensor.to(device))
-        speech_mask[..., :-1] += speech_mask[
-            ..., 1:
-        ].clone()  # Pre-bounce speech starts
-
-        time_segments.extend(
-            [
-                frame_labels_to_time_segments(
-                    m,
-                    vad.frame_shift,
-                    filter_with=lambda x: (x.symbol is True)
-                    and (min_duration <= x.duration <= max_duration),
-                )
-                for m in speech_mask
-            ]
+    return [
+        frame_labels_to_time_segments(
+            m,
+            vad.frame_shift,
+            filter_with=lambda x: (x.symbol is True)
+            and (min_duration <= x.duration <= max_duration),
         )
-
-    return time_segments
+        for m in speech_mask
+    ]
 
 
 @lru_cache(maxsize=1)
