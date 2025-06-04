@@ -9,6 +9,7 @@ def is_oom_error(exception: BaseException) -> bool:
         or is_cudnn_snafu(exception)
         or is_out_of_cpu_memory(exception)
         or is_onnx_out_of_memory(exception)
+        or is_cufft_out_of_memory(exception)
     )
 
 
@@ -37,6 +38,14 @@ def is_cufft_snafu(exception: BaseException) -> bool:
         isinstance(exception, RuntimeError)
         and len(exception.args) >= 1
         and "cuFFT error: CUFFT_INTERNAL_ERROR" in exception.args[0]
+    )
+
+
+def is_cufft_out_of_memory(exception: BaseException) -> bool:
+    return (
+        isinstance(exception, RuntimeError)
+        and len(exception.args) >= 1
+        and "cuFFT error: CUFFT_ALLOC_FAILED" in exception.args[0]
     )
 
 
