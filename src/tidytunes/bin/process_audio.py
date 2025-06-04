@@ -17,7 +17,7 @@ from tidytunes.pipeline_components import (
 )
 from tidytunes.pipeline_components.dnsmos import load_dnsmos_model
 from tidytunes.utils import Audio, partition, setup_logger, trim_audios
-from tidytunes.utils.memory import garbage_collection_cuda, is_cuda_out_of_memory
+from tidytunes.utils.memory import garbage_collection_cuda, is_oom_error
 
 PIPELINE_FUNCTIONS = {
     "voice_separation": find_segments_without_music,
@@ -49,7 +49,7 @@ def process_audio(audios, device, pipeline_components):
             else:
                 audio_segments = trim_audios(audio_segments, values)
         except RuntimeError as e:
-            if not is_cuda_out_of_memory(e):
+            if not is_oom_error(e):
                 raise
             garbage_collection_cuda()
             audio_segments = []
