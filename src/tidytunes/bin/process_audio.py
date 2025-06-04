@@ -129,7 +129,11 @@ def process_audios(audio_paths, config, out, device, overwrite):
 
     with open(out_processed, "a+") as f:
         for pth in paths:
-            audio = Audio.from_file(pth)
+            try:
+                audio = Audio.from_file(pth)
+            except Exception as e:
+                click.secho(f"Failed to load audio {pth}: {e}", fg="red", bold=True)
+                continue
             audio_segments, throughput_stats = process_audio(
                 [audio], device, pipeline_components
             )
