@@ -96,7 +96,9 @@ def find_cluster_centers(embeddings: torch.Tensor, num_clusters):
         Cluster centers of shape (C, D).
     """
     num_clusters = min(len(embeddings), num_clusters)
-    kmeans = KMeans(n_clusters=num_clusters, n_init="auto").fit(embeddings.cpu())
+    kmeans = KMeans(n_clusters=num_clusters, n_init="auto", random_state=42).fit(
+        embeddings.cpu()
+    )
 
     ag = AgglomerativeClustering(
         metric="cosine", n_clusters=None, distance_threshold=0.6, linkage="complete"
