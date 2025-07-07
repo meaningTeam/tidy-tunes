@@ -16,7 +16,13 @@ from tidytunes.pipeline_components import (
     get_rolloff_frequency,
 )
 from tidytunes.pipeline_components.dnsmos import load_dnsmos_model
-from tidytunes.utils import Audio, partition, setup_logger, trim_audios
+from tidytunes.utils import (
+    Audio,
+    configure_logger,
+    get_logger,
+    partition,
+    trim_audios,
+)
 from tidytunes.utils.memory import garbage_collection_cuda, is_oom_error
 
 PIPELINE_FUNCTIONS = {
@@ -32,10 +38,20 @@ PIPELINE_FUNCTIONS = {
 
 def process_audio(audios, device, pipeline_components):
     assert len(audios) == 1
+    logger = get_logger()
     throughput_stats = {}
     audio_segments = audios
 
+    logger.info(
+        f"Starting audio processing pipeline with {len(pipeline_components)} components"
+    )
+    logger.info(f"Initial audio duration: {audios[0].duration:.2f} seconds")
+
     for name, func, kwargs, filter_fn in pipeline_components:
+        logger.info(f"Starting pipeline step: {name}")
+        logger.debug(
+            f"Step {name} - Input segments: {len(audio_segments)}, Total duration: {sum(a.duration for a in audio_segments):.2f}s"
+        )
 
         # to improve batching efficiency
         audio_segments = sorted(audio_segments, key=lambda x: x.duration)
@@ -48,21 +64,33 @@ def process_audio(audios, device, pipeline_components):
                 )
             else:
                 audio_segments = trim_audios(audio_segments, values)
+
+            throughput_stats[name] = sum(a.duration for a in audio_segments)
+            logger.info(
+                f"Completed pipeline step: {name} - Remaining segments: {len(audio_segments)}, Duration: {throughput_stats[name]:.2f}s"
+            )
+
         except RuntimeError as e:
             if not is_oom_error(e):
                 raise
             garbage_collection_cuda()
             audio_segments = []
+            logger.error(
+                f"Pipeline step {name} failed with OOM error, skipping remaining processing"
+            )
             click.secho(
                 "Failed to process a possibly too large audio file! Skipping ...",
                 fg="red",
                 bold=True,
             )
 
-        throughput_stats[name] = sum(a.duration for a in audio_segments)
         if not audio_segments:
+            logger.warning(f"No audio segments remaining after step: {name}")
             return audio_segments, throughput_stats
 
+    logger.info(
+        f"Audio processing pipeline completed. Final segments: {len(audio_segments)}"
+    )
     return audio_segments, throughput_stats
 
 
@@ -91,7 +119,15 @@ def process_audio(audios, device, pipeline_components):
 )
 @click.option("--overwrite", "-w", is_flag=True, help="Overwrite processed files.")
 def process_audios(audio_paths, config, out, device, overwrite):
-    logger = setup_logger("tidytunes", log_file="pipeline.log.txt")
+    # Configure the shared logger
+    configure_logger(log_file="pipeline.log.txt")
+    logger = get_logger()
+
+    logger.info("Starting audio processing batch")
+    logger.info(f"Config file: {config}")
+    logger.info(f"Output directory: {out}")
+    logger.info(f"Device: {device}")
+    logger.info(f"Overwrite: {overwrite}")
 
     with open(config, "r") as f:
         config_data = yaml.safe_load(f)
@@ -107,6 +143,11 @@ def process_audios(audio_paths, config, out, device, overwrite):
         condition = eval(component["condition"]) if "condition" in component else None
 
         pipeline_components.append((name, func, params, condition))
+        logger.info(f"Configured pipeline component: {name} with params: {params}")
+
+    logger.info(
+        f"Pipeline configured with {len(pipeline_components)} components: {[c[0] for c in pipeline_components]}"
+    )
 
     out_path = Path(out)
     out_path.mkdir(exist_ok=True, parents=True)
@@ -128,12 +169,18 @@ def process_audios(audio_paths, config, out, device, overwrite):
     )
 
     with open(out_processed, "a+") as f:
-        for pth in paths:
+        for i, pth in enumerate(paths, 1):
+            logger.info(f"Processing file {i}/{len(paths)}: {pth}")
             try:
                 audio = Audio.from_file(pth)
+                logger.debug(
+                    f"Loaded audio file - Duration: {audio.duration:.2f}s, Sample rate: {audio.sampling_rate}"
+                )
             except Exception as e:
+                logger.error(f"Failed to load audio {pth}: {e}")
                 click.secho(f"Failed to load audio {pth}: {e}", fg="red", bold=True)
                 continue
+
             audio_segments, throughput_stats = process_audio(
                 [audio], device, pipeline_components
             )
@@ -151,4 +198,9 @@ def process_audios(audio_paths, config, out, device, overwrite):
             for a in audio_segments:
                 a.to_file(root=out_path / a.origin.id)
 
+            logger.info(
+                f"Saved {len(audio_segments)} audio segments for {audio.origin.id}"
+            )
+
+    logger.info("Processing finished!")
     click.secho(f"Processing finished!", fg="green", bold=True)

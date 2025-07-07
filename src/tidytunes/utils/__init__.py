@@ -8,5 +8,6 @@ from .etc import (
     to_batches,
 )
 from .logging import setup_logger
+from .shared_logger import configure_logger, get_logger
 from .tensors import masked_mean, masked_std, sequence_mask
 from .trace import TraceMixin
