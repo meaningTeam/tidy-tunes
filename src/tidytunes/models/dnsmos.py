@@ -157,7 +157,11 @@ class DNSMOSPredictor(torch.nn.Module):
 
             shape = audio_seg.shape
             audio_seg = audio_seg.reshape((-1, shape[-1])).contiguous()
-            mel_seg = self.extract_features(audio_seg[..., :-160]).transpose(1, 2).contiguous()
+            mel_seg = (
+                self.extract_features(audio_seg[..., :-160])
+                .transpose(1, 2)
+                .contiguous()
+            )
 
             base_binding.bind_input(
                 name="input_1",
