@@ -1,3 +1,4 @@
+from .asr_comparison import get_asr_agreement
 from .denoising import get_denoised_pesq
 from .dnsmos import get_dnsmos
 from .gender_classification import is_male

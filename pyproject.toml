@@ -30,6 +30,10 @@ dependencies = [
     "yt-dlp",
     "click",
     "python-dotenv",
+    "transformers>=4.30.0",
+    "accelerate",
+    "sentencepiece",
+    "jiwer",
 ]
 
 [project.optional-dependencies]

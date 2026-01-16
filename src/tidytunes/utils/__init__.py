@@ -1,4 +1,5 @@
-from .audio import Audio, collate_audios, decollate_audios, trim_audios
+from .asr import compute_wer
+from .audio import Audio, Segment, collate_audios, decollate_audios, trim_audios
 from .download import download_github
 from .etc import (
     SpeculativeBatcher,

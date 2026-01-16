@@ -1,3 +1,9 @@
+from .asr import (
+    ASRModel,
+    AlignedWord,
+    VoxtralASR,
+    WhisperASR,
+)
 from .dnsmos import DNSMOSPredictor
 from .language_id import SpokenLanguageIdentificationModel
 from .rolloff import RollOff
