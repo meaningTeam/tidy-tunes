@@ -1,8 +1,4 @@
-from .asr import (
-    ASRModel,
-    VoxtralASR,
-    WhisperASR,
-)
+from .asr import ASRModel, VoxtralASR, WhisperASR
 from .dnsmos import DNSMOSPredictor
 from .language_id import SpokenLanguageIdentificationModel
 from .music import MusicDetectionModel
