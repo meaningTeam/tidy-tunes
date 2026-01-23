@@ -16,12 +16,12 @@ def get_asr_agreement(
 ) -> list[float]:
     """
     Compute ASR agreement (as WER) between two ASR models for audio segments.
-    
+
     Runs two ASR models on each audio segment, computes WER between their
     transcriptions, and returns the WER values. Also associates the transcript
     from the primary model with each audio segment's origin metadata for later
     saving.
-    
+
     Args:
         audio (list[Audio]): List of audio segments to process.
         language (str, optional): Language code (e.g., 'en', 'fr') to guide ASR.
@@ -31,7 +31,7 @@ def get_asr_agreement(
             "voxtral". Default: "whisper".
         secondary_model (str): Name of the secondary ASR model used for comparison.
             Options: "whisper", "voxtral". Default: "voxtral".
-    
+
     Returns:
         list[float]: WER values for each audio segment. Lower values indicate
             better agreement between the two ASR models (0.0 = perfect match).
@@ -57,6 +57,7 @@ def get_asr_agreement(
 
     return wer_values
 
+
 @lru_cache(maxsize=2)
 def load_asr_model(model_name: str, device: str = "cpu") -> ASRModel:
     from tidytunes.models import VoxtralASR, WhisperASR
@@ -69,6 +70,6 @@ def load_asr_model(model_name: str, device: str = "cpu") -> ASRModel:
         raise ValueError(
             f"Unknown ASR model: {model_name}. Choose 'whisper' or 'voxtral'."
         )
-    
+
     model = model.eval().to(device)
     return model

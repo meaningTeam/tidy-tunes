@@ -1,5 +1,3 @@
-
-
 def compute_wer(reference: str, hypothesis: str) -> float:
     """
     Compute Word Error Rate (WER) between two transcriptions using jiwer.
@@ -28,14 +26,14 @@ def compute_wer(reference: str, hypothesis: str) -> float:
         wer = jiwer.wer(
             reference,
             hypothesis,
-            truth_transform=transformation,
+            reference_transform=transformation,
             hypothesis_transform=transformation,
         )
         return wer
     except Exception as e:
         ref_normalized = transformation(reference)
         hyp_normalized = transformation(hypothesis)
-        
+
         if not ref_normalized[0] and not hyp_normalized[0]:
             return 0.0
         elif not ref_normalized[0] or not hyp_normalized[0]:

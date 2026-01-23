@@ -14,6 +14,7 @@ from tidytunes.pipeline_components import (
     get_denoised_pesq,
     get_dnsmos,
     get_language_probabilities,
+    get_music_probability,
     get_rolloff_frequency,
 )
 from tidytunes.pipeline_components.dnsmos import load_dnsmos_model
@@ -29,6 +30,7 @@ PIPELINE_FUNCTIONS = {
     "mos_filtering": get_dnsmos,
     "language_filtering": get_language_probabilities,
     "asr_filtering": get_asr_agreement,
+    "music_detection": get_music_probability,
 }
 
 

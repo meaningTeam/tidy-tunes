@@ -15,6 +15,7 @@ def find_segments_with_speech(
     audio: list[Audio],
     min_duration: float = 3.2,
     max_duration: float = 30.0,
+    prebounce_frames: int = 2,
     device: str = "cpu",
 ):
     """
@@ -24,6 +25,7 @@ def find_segments_with_speech(
         audio (list[Audio]): List of Audio objects.
         min_duration (float): Minimum duration for a valid speech segment (default: 3.2).
         max_duration (float): Maximum duration for a valid speech segment (default: 30.0).
+        prebounce_frames (int): Number of frames (80ms) to shift the speech starts to the left (default: 2).
         device (str): The device to run the VAD model on (default: "cpu").
 
     Returns:
@@ -34,7 +36,6 @@ def find_segments_with_speech(
     audio_tensor, _ = collate_audios(audio, vad.sampling_rate)
     with torch.no_grad():
         speech_mask = vad(audio_tensor.to(device))
-    speech_mask[..., :-1] += speech_mask[..., 1:].clone()  # Pre-bounce speech starts
 
     return [
         frame_labels_to_time_segments(
@@ -42,8 +43,10 @@ def find_segments_with_speech(
             vad.frame_shift,
             filter_with=lambda x: (x.symbol is True)
             and (min_duration <= x.duration <= max_duration),
+            segment_duration=a.duration,
+            prebounce_frames=prebounce_frames,
         )
-        for m in speech_mask
+        for m, a in zip(speech_mask, audio)
     ]
 
 

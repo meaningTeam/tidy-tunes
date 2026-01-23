@@ -27,6 +27,8 @@ def frame_labels_to_time_segments(
     frame_labels: torch.Tensor,
     frame_shift: float,
     filter_with=None,
+    segment_duration: float | None = None,
+    prebounce_frames: int = 0,
 ) -> list[Segment]:
     """
     Converts a 1-D tensor of frame labels to a list of Segments, each having
@@ -38,11 +40,28 @@ def frame_labels_to_time_segments(
         frame_shift (float): Frame shift, used to convert frame indices to time stamps.
         filter_with (callable, optional): Filtering function of output segments.
                                           Defaults to no filtering.
+        segment_duration (float, optional): Duration of the original audio segment in
+            seconds. If provided, validates that labels cover at least this duration
+            and clamps the last segment to not exceed this duration.
+        prebounce_frames (int): Number of frames to shift the segment starts to the left (default: 0).
 
     Returns:
         list[Segment]: List of possibly filtered segments labeled with symbols.
+
+    Raises:
+        ValueError: If segment_duration is provided and labels don't cover the
+            required duration.
     """
     assert frame_labels.ndim == 1
+
+    if segment_duration is not None:
+        expected_frames = segment_duration / frame_shift
+        if expected_frames - len(frame_labels) > 1e-2:
+            raise ValueError(
+                f"Frame labels ({len(frame_labels)} frames) don't cover the required "
+                f"segment duration ({segment_duration}s, expecting at least "
+                f"{expected_frames:.1f} frames with frame_shift={frame_shift}s)"
+            )
 
     if filter_with is None:
         filter_with = lambda x: True
@@ -54,11 +73,23 @@ def frame_labels_to_time_segments(
     for symbol, fc, st in zip(
         frame_labels.tolist(), frame_count.tolist(), start_frame.tolist()
     ):
-        item = Segment(
-            start=round(st * frame_shift, 2),
-            duration=round(fc * frame_shift, 2),
-            symbol=symbol,
-        )
+        if prebounce_frames > 0:
+            new_st = max(st - prebounce_frames, 0)
+            fc = fc + (st - new_st)
+            st = new_st
+
+        start = round(st * frame_shift, 3)
+        duration = round(fc * frame_shift, 3)
+
+        # clamp the segment end to not exceed segment_duration
+        if segment_duration is not None:
+            end = start + duration
+            if end > segment_duration:
+                duration = round(segment_duration - start, 3)
+                if duration <= 0:
+                    continue
+
+        item = Segment(start=start, duration=duration, symbol=symbol)
         if filter_with(item):
             segments.append(item)
 

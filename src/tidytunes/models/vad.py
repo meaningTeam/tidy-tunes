@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from tidytunes.models.external import SileroVAD
 
@@ -8,10 +9,10 @@ class VoiceActivityDetector(nn.Module):
     def __init__(
         self,
         model: SileroVAD,
-        frame_shift: float = 0.16,
+        frame_shift: float = 0.08,
         min_silence_chunks: int = 4,
-        start_threshold: float = 0.9,
-        end_threshold: float = 0.9,
+        start_threshold: float = 0.7,
+        end_threshold: float = 0.2,
     ):
         """
         Voice Activity Detector using SileroVAD.
@@ -51,6 +52,8 @@ class VoiceActivityDetector(nn.Module):
             Binary mask (B, L) indicating speech presence.
         """
         audio_16khz = torch.atleast_2d(audio_16khz)
+        audio_16khz = F.pad(audio_16khz, (0, self.n_samples - 1))
+
         self.initialize(len(audio_16khz), str(audio_16khz.device))
 
         max_length = (audio_16khz.shape[-1] // self.n_samples) * self.n_samples

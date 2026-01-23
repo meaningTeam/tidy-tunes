@@ -63,7 +63,7 @@ def load_demucs(device: str = "cpu"):
 
     pipeline = torchaudio.pipelines.HDEMUCS_HIGH_MUSDB_PLUS
     demucs = pipeline._model_factory_func()
-    model_path = torchaudio.utils.download_asset(pipeline._model_path)
+    model_path = torchaudio.utils._download_asset(pipeline._model_path)
 
     state_dict = torch.load(model_path, weights_only=True)
     demucs.load_state_dict(state_dict)

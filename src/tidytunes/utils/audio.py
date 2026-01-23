@@ -152,7 +152,7 @@ class Audio:
             transcript = self.origin.transcript if self.origin else None
             if isinstance(segment.symbol, tuple) and len(segment.symbol) == 2:
                 _, transcript = segment.symbol
-            
+
             new_origin = OriginMetadata(
                 id=self.origin.id,
                 start=self.origin.start + segment.start,
