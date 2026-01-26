@@ -4,6 +4,7 @@ import torch
 
 from tidytunes.utils import (
     Audio,
+    batched,
     collate_audios,
     masked_max,
     masked_mean,
@@ -11,6 +12,7 @@ from tidytunes.utils import (
 )
 
 
+@batched(batch_size=128, batch_duration=1280.0)
 def get_music_probability(
     audio: list[Audio],
     reduction: str = "max",

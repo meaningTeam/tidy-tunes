@@ -54,6 +54,8 @@ class SpeakerEncoder(torch.nn.Module):
 
     def split_to_chunks(self, x: torch.Tensor):
         pad_size = (self.window_size - 1) * self.hop_length
-        x = F.pad(x.unsqueeze(0), (pad_size, pad_size), mode="reflect").squeeze(0)
+        x = F.pad(
+            x.unsqueeze(0), (pad_size, pad_size + self.hop_length - 1), mode="reflect"
+        ).squeeze(0)
         frames_flat = x.unfold(0, self.window_size * self.hop_length, self.hop_length)
         return frames_flat

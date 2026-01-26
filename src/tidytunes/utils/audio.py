@@ -111,9 +111,7 @@ class Audio:
 
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        torchaudio.save(
-            str(path), self.data.unsqueeze(0), self.sampling_rate, format="flac"
-        )
+        torchaudio.save(str(path), self.data.unsqueeze(0), self.sampling_rate)
 
         if self.origin and self.origin.transcript:
             transcript_path = path.with_suffix(".txt")
