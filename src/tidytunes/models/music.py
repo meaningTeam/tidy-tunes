@@ -48,3 +48,9 @@ class MusicDetectionModel(nn.Module):
         lens = (audio_16khz_lens - 400) // 320 + 1
 
         return probs, lens
+
+    @classmethod
+    def from_files(cls, model_weights_path: str) -> "MusicDetectionModel":
+        model = cls()
+        model.load_state_dict(torch.load(model_weights_path))
+        return model

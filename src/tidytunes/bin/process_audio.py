@@ -116,6 +116,10 @@ def process_audios(audio_paths, config, out, device, overwrite):
     out_path.mkdir(exist_ok=True, parents=True)
     out_processed = out_path / "pipeline.processed.json"
 
+    config_copy_path = out_path / "pipeline.config.yaml"
+    with open(config_copy_path, "w") as f:
+        yaml.dump(config_data, f, default_flow_style=False)
+
     torch.backends.cudnn.benchmark = False
     load_dnsmos_model(torch.device(device), True, 8)
 

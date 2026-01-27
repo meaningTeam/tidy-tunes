@@ -29,7 +29,7 @@ def get_music_probability(
         A tensor of shape (B,) containing the background music probabilities for each audio segment.
     """
 
-    detector = get_music_detector(device)
+    detector = load_music_detector(device)
     a, al = collate_audios(audio, detector.sampling_rate)
 
     with torch.no_grad():
@@ -48,22 +48,27 @@ def get_music_probability(
 
 
 @lru_cache()
-def get_music_detector(device: str):
+def load_music_detector(device: str, tag: str = None):
     """
     Loads and caches the music detection model.
 
     device (str): The device to place the module on (default: "cpu").
+    tag (str): Model version tag
 
     Returns:
         A music detection model.
     """
     from tidytunes.models import MusicDetectionModel
+    from tidytunes.utils.download import download_github
 
-    detector = MusicDetectionModel()
-    detector.load_state_dict(
-        torch.load(
-            "/mnt/homes/tomiinek/various_scripts/checkpoints/best_model/model.pt"
-        )
+    model_weights_path = download_github(
+        [
+            "music_detector.pt.part-aa",
+            "music_detector.pt.part-ab",
+            "music_detector.pt.part-ac",
+        ],
+        tag,
     )
+    detector = MusicDetectionModel.from_files(model_weights_path)
     detector = detector.eval().to(device)
     return detector

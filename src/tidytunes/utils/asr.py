@@ -22,21 +22,12 @@ def compute_wer(reference: str, hypothesis: str) -> float:
         ]
     )
 
-    try:
-        wer = jiwer.wer(
-            reference,
-            hypothesis,
-            reference_transform=transformation,
-            hypothesis_transform=transformation,
-        )
-        return wer
-    except Exception as e:
-        ref_normalized = transformation(reference)
-        hyp_normalized = transformation(hypothesis)
+    ref_normalized = transformation(reference)
+    hyp_normalized = transformation(hypothesis)
 
-        if not ref_normalized[0] and not hyp_normalized[0]:
-            return 0.0
-        elif not ref_normalized[0] or not hyp_normalized[0]:
-            return 1.0
-        else:
-            raise e
+    if not ref_normalized[0] and not hyp_normalized[0]:
+        return 0.0
+    elif not ref_normalized[0] or not hyp_normalized[0]:
+        return 1.0
+    else:
+        return jiwer.wer(reference, hypothesis)
