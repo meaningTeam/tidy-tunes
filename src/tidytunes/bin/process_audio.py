@@ -10,9 +10,11 @@ from tidytunes.pipeline_components import (
     find_segments_with_single_speaker,
     find_segments_with_speech,
     find_segments_without_music,
+    get_asr_agreement,
     get_denoised_pesq,
     get_dnsmos,
     get_language_probabilities,
+    get_music_probability,
     get_rolloff_frequency,
 )
 from tidytunes.pipeline_components.dnsmos import load_dnsmos_model
@@ -33,6 +35,8 @@ PIPELINE_FUNCTIONS = {
     "denoising": get_denoised_pesq,
     "mos_filtering": get_dnsmos,
     "language_filtering": get_language_probabilities,
+    "asr_filtering": get_asr_agreement,
+    "music_detection": get_music_probability,
 }
 
 
@@ -152,6 +156,10 @@ def process_audios(audio_paths, config, out, device, overwrite):
     out_path = Path(out)
     out_path.mkdir(exist_ok=True, parents=True)
     out_processed = out_path / "pipeline.processed.json"
+
+    config_copy_path = out_path / "pipeline.config.yaml"
+    with open(config_copy_path, "w") as f:
+        yaml.dump(config_data, f, default_flow_style=False)
 
     torch.backends.cudnn.benchmark = False
     load_dnsmos_model(torch.device(device), True, 8)

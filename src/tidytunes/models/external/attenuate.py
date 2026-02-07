@@ -1,5 +1,5 @@
 """
-This file is based on code from the attenuate 0.1.1 package, 
+This file is based on code from the attenuate 0.1.1 package,
 available at https://pypi.org/project/attenuate/.
 
 The concepts implemented in this code are described in the paper:

@@ -1,6 +1,6 @@
 """
 This file contains code that follows the model design of SileroVAD,
-available at https://github.com/snakers4/silero-vad. 
+available at https://github.com/snakers4/silero-vad.
 
 SileroVAD is released under the MIT license, and while this implementation
 is not directly copied from the repository, it is inspired by the original
@@ -95,7 +95,7 @@ class SileroVAD(nn.Module, TraceMixin):
         dtype: torch.dtype = torch.float,
     ):
         assert dtype == torch.float
-        audio_16khz = torch.randn(batch, 2560, device=device, dtype=dtype)
+        audio_16khz = torch.randn(batch, 1280, device=device, dtype=dtype)
         state = self.init_state(batch, device, dtype=dtype)
         return (audio_16khz, state)
 

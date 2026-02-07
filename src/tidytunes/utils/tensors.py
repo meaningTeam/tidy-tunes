@@ -36,6 +36,18 @@ def collate_tensors(
     return padded, lens
 
 
+def masked_max(
+    x: torch.Tensor, x_mask: torch.Tensor | None = None, dim: int = -1
+) -> torch.Tensor:
+    """
+    Calculate the maximum value of each row of the input tensor `x` in the given dimension dim,
+    while respecting `x_mask` with True on valid input positions and False otherwise.
+    """
+    if x_mask is not None:
+        x[~x_mask] = -float("inf")
+    return x.max(dim=dim).values
+
+
 def masked_mean(
     x: torch.Tensor, x_mask: torch.Tensor | None = None, dim: int = -1
 ) -> torch.Tensor:

@@ -5,11 +5,13 @@ Tidy Tunes is an easy-to-use pipeline for mining high-quality audio data for spe
 Specifically, the pipeline includes (see also https://www.arxiv.org/pdf/2409.03283):
 - voice source segmentation
 - segmentation based on voice activity detection
-- speaker segmentation 
+- speaker segmentation
 - rolloff frequency filtering
 - filtering based on PESQ of denoised audio 
 - DNSMOS filtering
 - spoken language identification filtering
+- background music detection
+- dual ASR verification
 
 It provides two commands, one for downloading audios from sources like YouTube, and one for processing the downloaded audio efficiently.
 
@@ -95,7 +97,7 @@ If used, please cite it as follows:
   title = {Tidy Tunes: An Easy-to-Use Pipeline for Mining High-Quality Audio Data},
   year = {2025},
   howpublished = {\url{https://github.com/meaningTeam/tidy-tunes}},
-  note = {Version 1.0.1}
+  note = {Version 1.1.0}
 }
 ```
 

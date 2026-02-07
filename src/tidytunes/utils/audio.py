@@ -18,6 +18,7 @@ class OriginMetadata:
     id: str
     start: float = 0.0
     end: float | None = None
+    transcript: str | None = None
 
 
 @dataclass
@@ -85,6 +86,7 @@ class Audio:
     ) -> Path:
         """
         Saves the audio data to a file in FLAC format.
+        If a transcript is available, also saves it to a .txt file.
 
         Args:
             root (str | Path, optional): Output directory, used only if the output file
@@ -109,9 +111,13 @@ class Audio:
 
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        torchaudio.save(
-            str(path), self.data.unsqueeze(0), self.sampling_rate, format="flac"
-        )
+        torchaudio.save(str(path), self.data.unsqueeze(0), self.sampling_rate)
+
+        if self.origin and self.origin.transcript:
+            transcript_path = path.with_suffix(".txt")
+            with open(transcript_path, "w", encoding="utf-8") as f:
+                f.write(self.origin.transcript)
+
         return path
 
     @property
@@ -141,10 +147,15 @@ class Audio:
             start = int(self.sampling_rate * segment.start)
             end = int(self.sampling_rate * (segment.start + segment.duration))
 
+            transcript = self.origin.transcript if self.origin else None
+            if isinstance(segment.symbol, tuple) and len(segment.symbol) == 2:
+                _, transcript = segment.symbol
+
             new_origin = OriginMetadata(
                 id=self.origin.id,
                 start=self.origin.start + segment.start,
                 end=self.origin.start + segment.start + segment.duration,
+                transcript=transcript,
             )
             trimmed.append(
                 Audio.from_array(

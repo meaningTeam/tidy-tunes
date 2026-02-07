@@ -1,4 +1,5 @@
-from .audio import Audio, collate_audios, decollate_audios, trim_audios
+from .asr import compute_wer
+from .audio import Audio, Segment, collate_audios, decollate_audios, trim_audios
 from .download import download_github
 from .etc import (
     SpeculativeBatcher,
@@ -9,5 +10,5 @@ from .etc import (
 )
 from .logging import setup_logger
 from .shared_logger import configure_logger, get_logger
-from .tensors import masked_mean, masked_std, sequence_mask
+from .tensors import masked_max, masked_mean, masked_std, sequence_mask
 from .trace import TraceMixin

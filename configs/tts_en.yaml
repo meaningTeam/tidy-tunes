@@ -1,0 +1,18 @@
+pipeline:
+  - name: "speech_segmentation"
+    params:
+      min_duration: 3.2
+      max_duration: 30.0
+  - name: "speaker_segmentation"
+    params:
+      min_duration: 3.2
+  - name: "music_detection"
+    condition: "lambda x: x < 0.5"
+  - name: "denoising"
+    condition: "lambda x: x > 3.3"
+  - name: "asr_filtering"
+    params:
+      primary_model: "whisper"
+      secondary_model: "voxtral"
+      language: "en"
+    condition: "lambda x: x == 0.0"
