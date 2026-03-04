@@ -15,7 +15,7 @@ def find_segments_with_speech(
     audio: list[Audio],
     min_duration: float = 3.2,
     max_duration: float = 30.0,
-    prebounce_frames: int = 2,
+    prebounce_frames: int = 5,
     device: str = "cpu",
 ):
     """
@@ -25,7 +25,7 @@ def find_segments_with_speech(
         audio (list[Audio]): List of Audio objects.
         min_duration (float): Minimum duration for a valid speech segment (default: 3.2).
         max_duration (float): Maximum duration for a valid speech segment (default: 30.0).
-        prebounce_frames (int): Number of frames (80ms) to shift the speech starts to the left (default: 2).
+        prebounce_frames (int): Number of frames (32ms) to shift the speech starts to the left (default: 5).
         device (str): The device to run the VAD model on (default: "cpu").
 
     Returns:
@@ -51,21 +51,18 @@ def find_segments_with_speech(
 
 
 @lru_cache(maxsize=1)
-def load_vad(device: str = "cpu", tag: str = None):
+def load_vad(device: str = "cpu"):
     """
-    Loads, traces, and caches the Voice Activity Detector (VAD) model.
+    Loads and caches the Voice Activity Detector (VAD) model.
 
     Args:
         device (str): The device to run the VAD model on (default: "cpu").
-        tag (str): The version tag for downloading the model
     Returns:
         VoiceActivityDetector: Loaded VAD model.
     """
-    from tidytunes.models import VoiceActivityDetector
-    from tidytunes.models.external import SileroVAD
-    from tidytunes.utils.download import download_github
+    from silero_vad import load_silero_vad
 
-    model_weights_path = download_github("silerovad_weights.pt", tag)
-    vad = SileroVAD.from_files(model_weights_path)
-    vad_trace = vad.to_jit_trace(device)
-    return VoiceActivityDetector(vad_trace).to(device)
+    from tidytunes.models import VoiceActivityDetector
+
+    model = load_silero_vad(onnx=False)
+    return VoiceActivityDetector(model).to(device)

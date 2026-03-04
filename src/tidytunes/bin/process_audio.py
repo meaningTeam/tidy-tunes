@@ -152,7 +152,7 @@ def process_audios(audio_paths, config, out, device, overwrite):
                 for k in throughput_stats
             )
             logger.info(
-                f"Audio {audio.origin.id}, preserved {timedelta(seconds=int(preserved))} ({throughput_str})"
+                f"Audio {audio.origin.id} ({audio.duration:.2f}s), preserved {timedelta(seconds=int(preserved))} ({throughput_str})"
             )
             print(pth, file=f, flush=True)
 
