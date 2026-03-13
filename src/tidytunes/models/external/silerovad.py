@@ -105,12 +105,10 @@ class SileroVADv6(nn.Module, TraceMixin):
             nn.Sigmoid(),
         )
 
-    @torch.jit.export
     @property
     def frame_shift(self):
         return self.chunk_size / self.sampling_rate
 
-    @torch.jit.export
     @property
     def sampling_rate(self):
         return 16000
