@@ -2,24 +2,22 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from tidytunes.models.external import SileroVAD
+from tidytunes.models.external import SileroVADv6
 
 
 class VoiceActivityDetector(nn.Module):
     def __init__(
         self,
-        model: SileroVAD,
-        frame_shift: float = 0.08,
-        min_silence_chunks: int = 4,
+        model: SileroVADv6,
+        min_silence_chunks: int = 6,
         start_threshold: float = 0.7,
         end_threshold: float = 0.2,
     ):
         """
-        Voice Activity Detector using SileroVAD.
+        Voice Activity Detector using SileroVADv6.
 
         Args:
-            vad (SileroVAD): Pre-trained SileroVAD model.
-            frame_shift (float): Frame shift duration in seconds.
+            model (SileroVADv6): Pre-trained SileroVADv6 model.
             min_silence_chunks (int): Minimum number of consecutive silence frames to trigger an end event.
             start_threshold (float): Probability threshold to start speech detection.
             end_threshold (float): Probability threshold to stop speech detection.
@@ -30,10 +28,10 @@ class VoiceActivityDetector(nn.Module):
         ), "start_threshold must be >= end_threshold"
 
         self.model = model
-        self.frame_shift = frame_shift
+        self.frame_shift = self.model.frame_shift
         self.start_threshold = start_threshold
         self.end_threshold = end_threshold
-        self.n_samples = int(frame_shift * model.sampling_rate)
+        self.n_samples = int(self.model.frame_shift * self.sampling_rate)
         self.min_silence_samples = min_silence_chunks * self.n_samples
 
     @property
@@ -72,6 +70,7 @@ class VoiceActivityDetector(nn.Module):
         was_speech = self.in_speech_cooldown > 0
 
         speech_prob, self.state = self.model(audio_16khz, self.state)
+
         trigger = speech_prob >= self.start_threshold
         decay = speech_prob < self.end_threshold
 
