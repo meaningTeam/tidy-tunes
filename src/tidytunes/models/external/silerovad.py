@@ -29,63 +29,96 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 
-from pathlib import Path
+import math
+from typing import Tuple
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import yaml
 
 from tidytunes.utils import TraceMixin
 
 
-class SileroVAD(nn.Module, TraceMixin):
+class STFT(nn.Module):
+    """Magnitude STFT via a windowed DFT basis stored as a conv1d filter."""
+
+    def __init__(self, n_fft: int = 256, hop_length: int = 128):
+        super().__init__()
+        self.n_fft = n_fft
+        self.hop_length = hop_length
+        self.pad_right = n_fft // 4
+
+        num_bins = n_fft // 2 + 1
+        window = torch.hann_window(n_fft, periodic=True)
+        n = torch.arange(n_fft, dtype=torch.float32)
+
+        real_basis = torch.zeros(num_bins, n_fft)
+        imag_basis = torch.zeros(num_bins, n_fft)
+        for k in range(num_bins):
+            phase = 2.0 * math.pi * k * n / n_fft
+            real_basis[k] = torch.cos(phase) * window
+            imag_basis[k] = -torch.sin(phase) * window
+
+        forward_basis = torch.cat([real_basis, imag_basis], dim=0).unsqueeze(1)
+        self.register_buffer("forward_basis_buffer", forward_basis)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = F.pad(x, [0, self.pad_right], mode="reflect")
+        x = x.unsqueeze(1)
+        ft = F.conv1d(x, self.forward_basis_buffer, stride=self.hop_length)
+        cutoff = self.n_fft // 2 + 1
+        real = ft[:, :cutoff, :].float()
+        imag = ft[:, cutoff:, :].float()
+        return torch.sqrt((real.pow(2) + imag.pow(2)).clamp_min(1e-16))
+
+
+class SileroVADv6(nn.Module, TraceMixin):
+
     def __init__(
         self,
-        hidden_dim: int = 64,
-        features_dim: int = 258,
-        num_layers: int = 2,
-        audio_padding_size: int = 96,
-        reduction: str = "mean",
+        context_size: int = 64,
+        chunk_size: int = 512,
+        n_fft: int = 256,
+        hop_length: int = 128,
+        hidden_dim: int = 128,
     ):
         super().__init__()
-        assert reduction in ["none", "mean", "sum", "max"]
-        self.reduction = reduction
-        self.hidden_dim = hidden_dim
-        self.num_layers = num_layers
-        self.audio_padding_size = audio_padding_size  # 96 samples ~ 6 ms
-        self.sampling_rate = 16000
-        self.input_conv = nn.Conv1d(1, features_dim, 256, stride=hidden_dim, bias=False)
-        self.mean_conv = nn.Conv1d(1, 1, 7, bias=False)
-        self.conv_blocks = nn.Sequential(
-            ConvBlock(features_dim, hidden_dim // 4, True, 2),
-            ConvBlock(hidden_dim // 4, hidden_dim // 2, True, 2),
-            ConvBlock(hidden_dim // 2, hidden_dim // 2, False, 2),
-            ConvBlock(hidden_dim // 2, hidden_dim, True, 1),
-        )
-        self.output_conv = nn.Conv1d(hidden_dim, 1, 1)
-        self.lstm = nn.LSTM(hidden_dim, hidden_dim, num_layers)
 
-    @classmethod
-    def from_files(cls, model_weights_path) -> "SileroVAD":
-        vad = cls()
-        vad.load_state_dict(
-            torch.load(model_weights_path, map_location="cpu", weights_only=True)
+        self.chunk_size = chunk_size
+        self.context_size = context_size
+        self.hidden_dim = hidden_dim
+
+        self.stft = STFT(n_fft=n_fft, hop_length=hop_length)
+        self.encoder = nn.ModuleList(
+            [
+                nn.Conv1d(129, 128, kernel_size=3, stride=1, padding=1),
+                nn.Conv1d(128, 64, kernel_size=3, stride=2, padding=1),
+                nn.Conv1d(64, 64, kernel_size=3, stride=2, padding=1),
+                nn.Conv1d(64, 128, kernel_size=3, stride=1, padding=1),
+            ]
         )
-        return vad
+        self.rnn = nn.LSTM(hidden_dim, hidden_dim, num_layers=1, batch_first=False)
+        self.decoder_head = nn.Sequential(
+            nn.Dropout(0.1),
+            nn.ReLU(),
+            nn.Conv1d(hidden_dim, 1, kernel_size=1),
+            nn.Sigmoid(),
+        )
+
+    @property
+    def frame_shift(self):
+        return self.chunk_size / self.sampling_rate
+
+    @property
+    def sampling_rate(self):
+        return 16000
 
     @torch.jit.export
-    def init_state(
-        self, batch: int, device: str = "cpu", dtype: torch.dtype = torch.float
-    ) -> list[torch.Tensor]:
-        assert dtype == torch.float
+    def init_state(self, batch: int = 1, device: str = "cpu") -> list[torch.Tensor]:
         return [
-            torch.zeros(
-                self.num_layers, batch, self.hidden_dim, device=device, dtype=dtype
-            ),
-            torch.zeros(
-                self.num_layers, batch, self.hidden_dim, device=device, dtype=dtype
-            ),
+            torch.zeros(batch, self.context_size, device=device),
+            torch.zeros(1, batch, self.hidden_dim, device=device, dtype=torch.float),
+            torch.zeros(1, batch, self.hidden_dim, device=device, dtype=torch.float),
         ]
 
     def dummy_inputs(
@@ -93,74 +126,61 @@ class SileroVAD(nn.Module, TraceMixin):
         batch: int = 2,
         device: str = "cpu",
         dtype: torch.dtype = torch.float,
-    ):
-        assert dtype == torch.float
-        audio_16khz = torch.randn(batch, 1280, device=device, dtype=dtype)
-        state = self.init_state(batch, device, dtype=dtype)
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Return a ``(audio_chunk, state)`` pair suitable for :meth:`forward`."""
+        audio_16khz = torch.randn(
+            batch,
+            self.chunk_size,
+            device=device,
+            dtype=dtype,
+        )
+        state = self.init_state(batch, device=device)
         return (audio_16khz, state)
 
-    def forward(self, audio_chunk_16khz: torch.Tensor, state: list[torch.Tensor]):
+    def _encode_chunks(self, x: torch.Tensor) -> torch.Tensor:
+        """Run STFT + conv encoder. Input ``[..., samples]``, output ``[..., 128]``."""
+        shape = x.shape[:-1]
+        x = x.reshape(-1, x.shape[-1])
+        x = self.stft(x)
+        for conv in self.encoder:
+            x = F.relu(conv(x))
+        return x.squeeze(-1).reshape(*shape, self.hidden_dim)
 
-        x = audio_chunk_16khz.unsqueeze(1)
+    def forward(
+        self,
+        audio_chunk_16khz: torch.Tensor,
+        state: list[torch.Tensor],
+    ) -> Tuple[torch.Tensor, list[torch.Tensor]]:
 
-        x = F.pad(
-            x.float().contiguous(),
-            (self.audio_padding_size, self.audio_padding_size),
-            mode="reflect",
-        )
-        x = self.input_conv(x)
+        x = torch.cat([state[0], audio_chunk_16khz], dim=1)
+        new_context = x[:, -self.context_size :]
 
-        a, b = torch.pow(x, 2).chunk(2, dim=1)
-        mag = (a + b).sqrt()
-        norm = (mag * (2**20) + 1).log()
-        mean = norm.mean(dim=1, keepdim=True)
+        x = self._encode_chunks(x)
+        x = x.unsqueeze(0)  # [1, B, H] for LSTM
 
-        # reflact pad 3 frames on both sides, one frame has 4 ms
-        left_pad = torch.flip(mean[..., 1:4], dims=[2])
-        right_pad = torch.flip(mean[..., -4:-1], dims=[2])
-        mean = torch.concat([left_pad, mean, right_pad], dim=2)
+        _, (h, c) = self.rnn(x, (state[1], state[2]))
 
-        mean = self.mean_conv(mean)
-        norm = norm - mean.mean(dim=-1, keepdim=True)
+        x = h.squeeze(0).unsqueeze(-1).float()
+        x = self.decoder_head(x)
+        out = x.squeeze(1).mean(dim=-1)
 
-        x = torch.cat([mag, norm], dim=1)
-        x = self.conv_blocks(x)
+        return out, [new_context, h, c]
 
-        # b c t -> t b c
-        x = x.permute(2, 0, 1)
-        x, state = self.lstm(x, state)
-        # t b c -> b c t
-        x = x.permute(1, 2, 0)
-
-        x = F.relu(x)
-        x = self.output_conv(x).squeeze(1)
-        y = F.sigmoid(x)
-
-        # reduce probability over each 32 ms chunk of the input
-        if self.reduction == "mean":
-            y = y.mean(keepdim=False, dim=1)
-        elif self.reduction == "sum":
-            y = y.sum(keepdim=False, dim=1)
-        elif self.reduction == "max":
-            y, _ = y.max(keepdim=False, dim=1)
-
-        return y, state
-
-
-class ConvBlock(nn.Module):
-    def __init__(self, in_dim: int, out_dim: int, use_residual: bool, stride: int):
-        super().__init__()
-        self.residual_conv = None
-        if use_residual:
-            self.residual_conv = nn.Conv1d(in_dim, out_dim, 1)
-        self.conv1 = nn.Conv1d(in_dim, in_dim, 5, groups=in_dim, padding=2)
-        self.conv2 = nn.Conv1d(in_dim, out_dim, 1)
-        self.conv3 = nn.Conv1d(out_dim, out_dim, 1, stride=stride)
-
-    def forward(self, x: torch.Tensor):
-        x2 = F.relu(self.conv1(x))
-        if self.residual_conv is not None:
-            x = self.residual_conv(x)
-        x = F.relu(self.conv2(x2) + x)
-        x = F.relu(self.conv3(x))
-        return x
+    @classmethod
+    def from_files(
+        cls,
+        model_weights_path: str,
+    ) -> "SileroVADv6":
+        model = cls()
+        sd = torch.load(model_weights_path, map_location="cpu", weights_only=True)
+        sd = {
+            {
+                "rnn.weight_ih": "rnn.weight_ih_l0",
+                "rnn.weight_hh": "rnn.weight_hh_l0",
+                "rnn.bias_ih": "rnn.bias_ih_l0",
+                "rnn.bias_hh": "rnn.bias_hh_l0",
+            }.get(k, k): v
+            for k, v in sd.items()
+        }
+        model.load_state_dict(sd)
+        return model

@@ -2,24 +2,26 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from tidytunes.models.external import SileroVAD
+from tidytunes.models.external import SileroVADv6
 
 
 class VoiceActivityDetector(nn.Module):
     def __init__(
         self,
-        model: SileroVAD,
-        frame_shift: float = 0.08,
-        min_silence_chunks: int = 4,
+        model: SileroVADv6 | torch.jit.ScriptModule,
+        frame_shift: float,
+        sampling_rate: int,
+        min_silence_chunks: int = 6,
         start_threshold: float = 0.7,
         end_threshold: float = 0.2,
     ):
         """
-        Voice Activity Detector using SileroVAD.
+        Voice Activity Detector using SileroVADv6.
 
         Args:
-            vad (SileroVAD): Pre-trained SileroVAD model.
-            frame_shift (float): Frame shift duration in seconds.
+            model (SileroVADv6): Pre-trained SileroVADv6 model.
+            frame_shift (int): VAD chunk shift in seconds.
+            sampling_rate (int): VAD Sampling rate in Hz.
             min_silence_chunks (int): Minimum number of consecutive silence frames to trigger an end event.
             start_threshold (float): Probability threshold to start speech detection.
             end_threshold (float): Probability threshold to stop speech detection.
@@ -31,14 +33,11 @@ class VoiceActivityDetector(nn.Module):
 
         self.model = model
         self.frame_shift = frame_shift
+        self.sampling_rate = sampling_rate
         self.start_threshold = start_threshold
         self.end_threshold = end_threshold
-        self.n_samples = int(frame_shift * model.sampling_rate)
+        self.n_samples = int(frame_shift * sampling_rate)
         self.min_silence_samples = min_silence_chunks * self.n_samples
-
-    @property
-    def sampling_rate(self):
-        return self.model.sampling_rate
 
     @torch.no_grad()
     def forward(self, audio_16khz):
@@ -72,6 +71,7 @@ class VoiceActivityDetector(nn.Module):
         was_speech = self.in_speech_cooldown > 0
 
         speech_prob, self.state = self.model(audio_16khz, self.state)
+
         trigger = speech_prob >= self.start_threshold
         decay = speech_prob < self.end_threshold
 
