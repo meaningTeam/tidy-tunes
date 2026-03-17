@@ -51,7 +51,7 @@ def find_segments_with_speech(
 
 
 @lru_cache(maxsize=1)
-def load_vad(device: str = "cpu"):
+def load_vad(device: str = "cpu", tag: str = None):
     """
     Loads and caches the Voice Activity Detector (VAD) model.
 
@@ -60,7 +60,6 @@ def load_vad(device: str = "cpu"):
     Returns:
         VoiceActivityDetector: Loaded VAD model.
     """
-    from silero_vad import load_silero_vad
 
     from tidytunes.models import VoiceActivityDetector
     from tidytunes.models.external import SileroVADv6
