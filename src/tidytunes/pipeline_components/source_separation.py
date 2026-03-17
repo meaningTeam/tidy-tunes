@@ -1,7 +1,7 @@
 from functools import lru_cache
 
 import torch
-from scipy.ndimage import q
+from scipy.ndimage import binary_closing
 
 from tidytunes.utils import (
     Audio,
