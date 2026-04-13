@@ -1,3 +1,4 @@
+from .accent_classification import get_accent_probabilities
 from .asr_comparison import get_asr_agreement
 from .denoising import get_denoised_pesq
 from .dnsmos import get_dnsmos

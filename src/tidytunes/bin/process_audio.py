@@ -10,6 +10,7 @@ from tidytunes.pipeline_components import (
     find_segments_with_single_speaker,
     find_segments_with_speech,
     find_segments_without_music,
+    get_accent_probabilities,
     get_asr_agreement,
     get_denoised_pesq,
     get_dnsmos,
@@ -29,6 +30,7 @@ PIPELINE_FUNCTIONS = {
     "denoising": get_denoised_pesq,
     "mos_filtering": get_dnsmos,
     "language_filtering": get_language_probabilities,
+    "accent_filtering": get_accent_probabilities,
     "asr_filtering": get_asr_agreement,
     "music_detection": get_music_probability,
 }
