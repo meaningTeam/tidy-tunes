@@ -10,7 +10,7 @@ def get_language_probabilities(
     audio: list[Audio],
     language_code: str,
     device: str = "cpu",
-) -> torch.Tensor:
+) -> list[tuple[torch.Tensor, dict]]:
     """
     Compute the probability of a given language being spoken in the audio.
 
@@ -20,16 +20,23 @@ def get_language_probabilities(
         device (str): The device to run the model on (default: "cpu").
 
     Returns:
-        Tensor (B,) of probabilities for the specified language.
+        list[tuple[Tensor, dict]]: Per-audio tuples of (target_language_prob,
+            full_distribution_dict) where the dict maps language codes to their
+            probabilities.
     """
-    model, lab2ind = load_langid_voxlingua107_ecapa(device)
-    lang_probs = []
+    model, lab2ind, ind2lab = load_langid_voxlingua107_ecapa(device)
 
     audio_16khz, audio_16khz_lens = collate_audios(audio, 16000)
     with torch.no_grad():
         out_prob, _, _ = model(audio_16khz.to(device), audio_16khz_lens.to(device))
 
-    return [p[lab2ind[language_code]] for p in out_prob]
+    return [
+        (
+            p[lab2ind[language_code]],
+            {ind2lab[i]: p[i].item() for i in range(len(p))},
+        )
+        for p in out_prob
+    ]
 
 
 @lru_cache(1)
@@ -53,4 +60,4 @@ def load_langid_voxlingua107_ecapa(device: str = "cpu", tag: str = None):
         download_github("lang_id_voxlingua107_ecapa_label_to_language.json", tag),
     )
     model_trace = model.to_jit_trace(device)
-    return model_trace, model.lab2ind
+    return model_trace, model.lab2ind, model.ind2lab

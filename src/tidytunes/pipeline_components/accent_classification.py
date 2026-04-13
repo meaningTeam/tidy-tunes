@@ -11,7 +11,7 @@ def get_accent_probabilities(
     accent_label: str,
     model_id: str = "badrex/mms-300m-arabic-dialect-identifier",
     device: str = "cpu",
-) -> list[float]:
+) -> list[float] | list[tuple[float, dict]]:
     """
     Compute the probability of a given accent/dialect being spoken in the audio.
 
@@ -23,7 +23,9 @@ def get_accent_probabilities(
         device (str): The device to run the model on (default: "cpu").
 
     Returns:
-        list[float]: Per-audio probabilities for the specified accent label.
+        list[float]: Per-audio probabilities for the specified accent label. When used
+            with ``annotate``, returns list[tuple[float, dict]] where each dict contains
+            the full probability distribution over all accent labels.
     """
     model, feature_extractor, label2id = load_accent_classifier(model_id, device)
 
@@ -34,6 +36,7 @@ def get_accent_probabilities(
         )
 
     target_idx = label2id[accent_label]
+    id2label = model.config.id2label
     raw_waveforms = [a.resample(16000).data.numpy() for a in audio]
 
     inputs = feature_extractor(
@@ -48,7 +51,13 @@ def get_accent_probabilities(
         logits = model(**inputs).logits
         probs = torch.softmax(logits, dim=-1)
 
-    return [p[target_idx].item() for p in probs]
+    return [
+        (
+            p[target_idx].item(),
+            {id2label[i]: p[i].item() for i in range(len(p))},
+        )
+        for p in probs
+    ]
 
 
 @lru_cache(maxsize=1)
@@ -69,8 +78,6 @@ def load_accent_classifier(model_id: str, device: str = "cpu"):
     model = model.eval().to(device)
     feature_extractor = AutoFeatureExtractor.from_pretrained(model_id)
 
-    label2id = {
-        label: idx for idx, label in model.config.id2label.items()
-    }
+    label2id = {label: idx for idx, label in model.config.id2label.items()}
 
     return model, feature_extractor, label2id
