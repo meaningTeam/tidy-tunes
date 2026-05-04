@@ -18,6 +18,7 @@ def find_segments_with_single_speaker(
     window_size: int = 64,
     num_clusters: int = 10,
     device: str = "cpu",
+    random_state=None,
 ):
     """
     Identifies segments in the audio where only a single speaker is present.
@@ -31,6 +32,7 @@ def find_segments_with_single_speaker(
         window_size (int): Size of the sliding window in model frames.
         num_clusters (int): Initial number of clusters before agglomertive clustering (defailt: 10).
         device (str): Device to run the model on (default: "cpu").
+        random_state: Random state for reproducible clustering (default: None).
 
     Returns:
         list[list[Segment]]: List of speaker segments for each input audio.
@@ -38,8 +40,7 @@ def find_segments_with_single_speaker(
 
     embeddings = get_speaker_embeddings(audio, window_size, device=device)
     embeddings_all = torch.cat(embeddings, dim=0)
-
-    centroids = find_cluster_centers(embeddings_all, num_clusters)
+    centroids = find_cluster_centers(embeddings_all, num_clusters, random_state)
     labels = [
         F.cosine_similarity(e.unsqueeze(1), centroids.unsqueeze(0), dim=-1).argmax(
             dim=-1
@@ -76,21 +77,20 @@ def get_speaker_embeddings(
     return e
 
 
-def find_cluster_centers(embeddings: torch.Tensor, num_clusters):
+def find_cluster_centers(embeddings: torch.Tensor, num_clusters, random_state=None):
     """
     Clusters speaker embeddings and refines cluster centers.
 
     Args:
         embeddings (N, D): Speaker embeddings.
         num_clusters (int): Initial number of clusters before agglomertive clustering.
+        random_state: Random state for reproducible clustering (default: None).
 
     Returns:
         Cluster centers of shape (C, D).
     """
     num_clusters = min(len(embeddings), num_clusters)
-    kmeans = KMeans(n_clusters=num_clusters, n_init="auto", random_state=42).fit(
-        embeddings.cpu()
-    )
+    kmeans = KMeans(n_clusters=num_clusters, n_init="auto", random_state=random_state).fit(embeddings.cpu())
 
     ag = AgglomerativeClustering(
         metric="cosine", n_clusters=None, distance_threshold=0.6, linkage="complete"

@@ -7,7 +7,7 @@ from pathlib import Path
 import click
 
 from tidytunes.bin import cli
-from tidytunes.utils import setup_logger
+from tidytunes.utils import configure_logger, get_logger
 
 
 def download_video(
@@ -103,7 +103,8 @@ def download_youtube(
     subtitle_language,
 ):
 
-    logger = setup_logger("tidytunes")
+    configure_logger()
+    logger = get_logger()
 
     proxy_api_key = proxy_api_key or os.getenv("API_KEY")
 
