@@ -56,7 +56,8 @@ def frame_labels_to_time_segments(
 
     if segment_duration is not None:
         expected_frames = segment_duration / frame_shift
-        if expected_frames - len(frame_labels) > 1e-2:
+        tolerance = max(1e-2, 1e-7 * expected_frames)
+        if expected_frames - len(frame_labels) > tolerance:
             raise ValueError(
                 f"Frame labels ({len(frame_labels)} frames) don't cover the required "
                 f"segment duration ({segment_duration}s, expecting at least "

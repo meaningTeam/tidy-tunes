@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -37,6 +38,7 @@ class Audio:
     data: torch.Tensor
     sampling_rate: int
     origin: OriginMetadata | None = None
+    annotations: dict[str, any] = field(default_factory=dict)
 
     @classmethod
     def from_array(
@@ -117,6 +119,11 @@ class Audio:
             transcript_path = path.with_suffix(".txt")
             with open(transcript_path, "w", encoding="utf-8") as f:
                 f.write(self.origin.transcript)
+
+        if self.annotations:
+            json_path = path.with_suffix(".json")
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(self.annotations, f, indent=2)
 
         return path
 

@@ -10,7 +10,9 @@ from tidytunes.pipeline_components import (
     find_segments_with_single_speaker,
     find_segments_with_speech,
     find_segments_without_music,
+    get_accent_probabilities,
     get_asr_agreement,
+    get_asr_transcript,
     get_denoised_pesq,
     get_dnsmos,
     get_language_probabilities,
@@ -29,8 +31,10 @@ PIPELINE_FUNCTIONS = {
     "denoising": get_denoised_pesq,
     "mos_filtering": get_dnsmos,
     "language_filtering": get_language_probabilities,
+    "accent_filtering": get_accent_probabilities,
     "asr_filtering": get_asr_agreement,
     "music_detection": get_music_probability,
+    "transcription": get_asr_transcript,
 }
 
 
@@ -39,18 +43,33 @@ def process_audio(audios, device, pipeline_components):
     throughput_stats = {}
     audio_segments = audios
 
-    for name, func, kwargs, filter_fn in pipeline_components:
+    for name, func, kwargs, filter_fn, annotate_key in pipeline_components:
 
         # to improve batching efficiency
         audio_segments = sorted(audio_segments, key=lambda x: x.duration)
 
         try:
-            values = func(audio_segments, device=device, **kwargs)
+            result = func(audio_segments, device=device, **kwargs)
+
+            # Rich components return list[tuple[filter_value, annotation]];
+            # simple components return list[filter_value].
+            if result and isinstance(result[0], tuple):
+                values = [r[0] for r in result]
+                annotations = [r[1] for r in result]
+            else:
+                values = result
+                annotations = values
+
+            if annotate_key:
+                for audio_seg, ann in zip(audio_segments, annotations):
+                    v = ann.item() if isinstance(ann, torch.Tensor) else ann
+                    audio_seg.annotations[annotate_key] = v
+
             if filter_fn:
                 audio_segments, _ = partition(
                     audio_segments, by=[filter_fn(v) for v in values]
                 )
-            else:
+            elif not annotate_key:
                 audio_segments = trim_audios(audio_segments, values)
         except RuntimeError as e:
             if not is_oom_error(e):
@@ -109,8 +128,9 @@ def process_audios(audio_paths, config, out, device, overwrite):
         func = PIPELINE_FUNCTIONS[name]
         params = component.get("params", {})
         condition = eval(component["condition"]) if "condition" in component else None
+        annotate_key = component.get("annotate", None)
 
-        pipeline_components.append((name, func, params, condition))
+        pipeline_components.append((name, func, params, condition, annotate_key))
 
     out_path = Path(out)
     out_path.mkdir(exist_ok=True, parents=True)

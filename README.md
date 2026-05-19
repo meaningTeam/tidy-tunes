@@ -10,8 +10,12 @@ Specifically, the pipeline includes (see also https://www.arxiv.org/pdf/2409.032
 - filtering based on PESQ of denoised audio 
 - DNSMOS filtering
 - spoken language identification filtering
+- accent / dialect classification
 - background music detection
 - dual ASR verification
+- single-model ASR transcription
+
+Each filtering component can run in **filtering mode** (keep/drop segments based on a threshold) or **annotation mode** (attach computed metadata to segments and save it alongside the audio). Both modes can be combined in a single pipeline step.
 
 It provides two commands, one for downloading audios from sources like YouTube, and one for processing the downloaded audio efficiently.
 
@@ -60,6 +64,30 @@ Options:
   -w, --overwrite                 Overwrite processed files.
 ```
 You can find the default config at `configs/full_en.yaml`. If needed, modify or disable the pipeline components and their parameters.
+
+### Pipeline configuration
+
+Each pipeline step in the YAML config supports the following keys:
+
+| Key | Description |
+|-----|-------------|
+| `name` | Name of the pipeline component (required). |
+| `params` | Dict of keyword arguments passed to the component function. |
+| `condition` | A Python lambda that receives the per-segment score and returns `True` to keep the segment. |
+| `annotate` | A string key under which the component's output is stored in the segment's annotations. |
+
+The interplay of `condition` and `annotate` determines the behaviour:
+
+| `condition` | `annotate` | Behaviour |
+|-------------|------------|-----------|
+| absent | absent | **Segmenting** — the component splits/trims audio (e.g. VAD, diarization). |
+| present | absent | **Filtering** — segments that fail the condition are dropped. |
+| absent | present | **Annotation only** — the score is stored, all segments pass through. |
+| present | present | **Annotate + filter** — the score is stored, then segments are filtered. |
+
+When annotations are present, they are saved as a JSON sidecar file (`.json`) next to each output audio segment. Some components provide **rich annotations** beyond a single scalar — for example, language ID and accent classification store the full probability distribution, and ASR comparison stores both transcripts alongside the WER.
+
+See `configs/annotate_en.yaml` for an example config that showcases all annotation modes.
 
 ## Using in Python
 

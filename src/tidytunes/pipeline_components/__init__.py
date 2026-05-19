@@ -1,4 +1,5 @@
-from .asr_comparison import get_asr_agreement
+from .accent_classification import get_accent_probabilities
+from .asr_comparison import get_asr_agreement, get_asr_transcript
 from .denoising import get_denoised_pesq
 from .dnsmos import get_dnsmos
 from .gender_classification import is_male
