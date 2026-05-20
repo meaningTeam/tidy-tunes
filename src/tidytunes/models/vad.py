@@ -6,6 +6,9 @@ from tidytunes.models.external import SileroVADv6
 
 
 class VoiceActivityDetector(nn.Module):
+    SAMPLING_RATE = 16000
+    WINDOW_SAMPLES = 512  # 32ms at 16kHz
+
     def __init__(
         self,
         model: SileroVADv6 | torch.jit.ScriptModule,
@@ -27,9 +30,7 @@ class VoiceActivityDetector(nn.Module):
             end_threshold (float): Probability threshold to stop speech detection.
         """
         super().__init__()
-        assert (
-            start_threshold >= end_threshold
-        ), "start_threshold must be >= end_threshold"
+        assert start_threshold >= end_threshold
 
         self.model = model
         self.frame_shift = frame_shift
@@ -42,13 +43,13 @@ class VoiceActivityDetector(nn.Module):
     @torch.no_grad()
     def forward(self, audio_16khz):
         """
-        Processes an audio signal to detect voice activity.
+        Processes audio signals to detect voice activity.
 
         Args:
-            audio_16khz (B, T): Input audio waveform (assumed to be sampled at 16kHz).
+            audio_16khz (B, T): Input audio waveforms at 16kHz.
 
         Returns:
-            Binary mask (B, L) indicating speech presence.
+            Binary mask (B, L) indicating speech presence per frame.
         """
         audio_16khz = torch.atleast_2d(audio_16khz)
         audio_16khz = F.pad(audio_16khz, (0, self.n_samples - 1))

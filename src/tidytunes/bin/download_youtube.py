@@ -43,7 +43,7 @@ def download_video(
     command = [
         "yt-dlp",
         "-f",
-        "bestaudio",
+        "bestaudio/best",
         "--extract-audio",
         "--audio-format",
         "flac",

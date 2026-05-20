@@ -1,6 +1,7 @@
 from functools import lru_cache
 
 import torch
+from scipy.ndimage import binary_closing
 
 from tidytunes.utils import (
     Audio,
@@ -13,7 +14,8 @@ from tidytunes.utils import (
 @batched(batch_size=1024, batch_duration=1280.0)
 def find_segments_without_music(
     audio: list[Audio],
-    min_duration: float = 6.4,
+    min_duration: float = 3.2,
+    closing_kernel: int = 5,
     device: str = "cpu",
 ):
     """
@@ -24,7 +26,8 @@ def find_segments_without_music(
         frame_shift (float): Time step between frames in seconds (default: 0.16).
         max_music_energy (float): Maximum allowed energy for non-vocal sources to be considered music-free (default: 0.01).
         min_speech_energy (float): Minimum required energy for vocal sources to be considered speech (default: 0.99).
-        min_duration (float): Minimum duration (in seconds) for valid speech segments (default: 6.4).
+        min_duration (float): Minimum duration (in seconds) for valid speech segments (default: 3.2).
+        closing_kernel (int): Size of the morphological closing kernel to bridge short gaps in the mask (default: 5).
         device (str): The device to run the model on (default: "cpu").
 
     Returns:
@@ -35,6 +38,16 @@ def find_segments_without_music(
     a, al = collate_audios(audio, demucs.sampling_rate)
     with torch.no_grad():
         speech_without_music_mask = demucs(a.to(device), al.to(device))
+
+    if closing_kernel > 1:
+        import numpy as np
+
+        structure = np.ones(closing_kernel)
+        for i in range(speech_without_music_mask.shape[0]):
+            m = speech_without_music_mask[i].cpu().numpy()
+            speech_without_music_mask[i] = torch.from_numpy(
+                binary_closing(m, structure=structure)
+            ).to(speech_without_music_mask.device)
 
     return [
         frame_labels_to_time_segments(
